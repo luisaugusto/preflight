@@ -53,5 +53,9 @@ jobs:
       - name: Validate content bundle
         run: npm run content:validate
 
+      # Pin the version: a bare `npx expo-doctor` resolves the latest published
+      # release on every run, so an upstream release could turn this required
+      # gate red on an unchanged commit despite the locked `npm ci`. 1.20.0 is
+      # the current release for SDK 57 (npm dist-tags: latest/next).
       - name: Expo Doctor
-        run: npx expo-doctor
+        run: npx expo-doctor@1.20.0
