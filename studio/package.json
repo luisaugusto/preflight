@@ -1,0 +1,39 @@
+{
+  "name": "preflight-studio",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "sanity dev",
+    "start": "sanity start",
+    "build": "sanity build",
+    "deploy": "sanity deploy",
+    "schema:validate": "sanity schema validate",
+    "schema:deploy": "sanity schemas deploy --verbose",
+    "typegen": "sanity schema extract --enforce-required-fields && sanity typegen generate",
+    "typecheck": "tsc --noEmit",
+    "seed:phak": "tsx scripts/seed-phak.ts",
+    "seed:phak:cli": "sanity exec scripts/seed-phak.ts --with-user-token",
+    "seed:phak:dry-run": "tsx scripts/seed-phak.ts --dry-run",
+    "export:bundle": "tsx scripts/export-bundle.ts",
+    "export:bundle:dry-run": "tsx scripts/export-bundle.ts --dry-run"
+  },
+  "dependencies": {
+    "@sanity/client": "^7.23.0",
+    "@sanity/icons": "^5.0.0",
+    "@sanity/vision": "^6.4.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sanity": "^6.4.0",
+    "styled-components": "^6.4.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=24.18"
+  }
+}

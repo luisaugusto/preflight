@@ -6,6 +6,7 @@ node_modules/
 # Expo
 .expo/
 dist/
+/dist-ios*/
 web-build/
 expo-env.d.ts
 
@@ -31,7 +32,17 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+
+# generated handbook extraction workspace
+/tmp/
+__pycache__/
+*.py[cod]
+
+# Sanity local build/cache
+/studio/.sanity/
+/studio/dist/
 
 # typescript
 *.tsbuildinfo

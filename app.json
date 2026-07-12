@@ -1,13 +1,15 @@
 {
   "expo": {
-    "name": "preflight",
+    "name": "Preflight",
     "slug": "preflight",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "preflight",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.luisaugusto.preflight"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +21,29 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "headers": {
+            "Cross-Origin-Embedder-Policy": "credentialless",
+            "Cross-Origin-Opener-Policy": "same-origin"
+          }
+        }
+      ],
+      "expo-sqlite",
+      "expo-font",
+      "expo-image",
+      "expo-asset"
+    ],
+    "extra": {
+      "sanityProjectId": "4qoowg94",
+      "sanityDataset": "production",
+      "sanityApiVersion": "2026-07-12",
+      "contentManifestUrl": "https://cdn.sanity.io/files/4qoowg94/production/dddd69d5f8b6101a0029948feb654703ad42f5a3.json"
     }
   }
 }
