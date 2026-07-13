@@ -1,0 +1,61 @@
+name: CI
+
+# With no analytics or crash reporting in the MVP, this workflow is the only
+# automated regression safety net. It runs the repo's four existing checks on
+# every pull request and on every push to main; any failure is a red, blocking
+# status.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Only the newest commit on a ref needs to gate; cancel superseded runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Node 22 resolves to the latest 22.x, matching the repo's documented
+      # 22.13+ requirement. `cache: npm` restores ~/.npm keyed on the lockfile.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # content:validate shells out to the dependency-free Python validator.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Clean, reproducible install from the lockfile (not `npm install`).
+      - name: Install dependencies
+        run: npm ci
+
+      # Four checks as separate steps so a red status names the failing gate.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Validate content bundle
+        run: npm run content:validate
+
+      # Pin the version: a bare `npx expo-doctor` resolves the latest published
+      # release on every run, so an upstream release could turn this required
+      # gate red on an unchanged commit despite the locked `npm ci`. 1.20.0 is
+      # the current release for SDK 57 (npm dist-tags: latest/next).
+      - name: Expo Doctor
+        run: npx expo-doctor@1.20.0
