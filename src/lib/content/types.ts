@@ -64,33 +64,29 @@ interface BaseQuestion {
 }
 
 export interface MultipleChoiceQuestion extends BaseQuestion {
-  type: "multipleChoice";
+  type: 'multipleChoice';
   options: string[];
   correctIndex: number;
 }
 
 export interface ImageQuestion extends BaseQuestion {
-  type: "image";
+  type: 'image';
   image: QuestionImage;
   options: string[];
   correctIndex: number;
 }
 
 export interface NumericQuestion extends BaseQuestion {
-  type: "numeric";
+  type: 'numeric';
   answer: NumericAnswerSpec;
 }
 
 export interface MatchingQuestion extends BaseQuestion {
-  type: "matching";
+  type: 'matching';
   pairs: MatchingPair[];
 }
 
-export type Question =
-  | MultipleChoiceQuestion
-  | ImageQuestion
-  | NumericQuestion
-  | MatchingQuestion;
+export type Question = MultipleChoiceQuestion | ImageQuestion | NumericQuestion | MatchingQuestion;
 
 export interface Lesson {
   id: ContentId;
@@ -146,12 +142,6 @@ export interface ContentBundle {
   module: ModuleContent;
 }
 
-export type ContentEntityType =
-  | "module"
-  | "section"
-  | "lesson"
-  | "question"
-  | "glossaryTerm";
+export type ContentEntityType = 'module' | 'section' | 'lesson' | 'question' | 'glossaryTerm';
 
-export type ReviewableContentType = "lesson" | "question" | "glossaryTerm";
-
+export type ReviewableContentType = 'lesson' | 'question' | 'glossaryTerm';

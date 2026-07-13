@@ -1,6 +1,6 @@
 # Preflight
 
-Preflight is an iOS-first Expo/React Native microlearning app for the FAA Private Pilot written test. This MVP ships the complete *Pilot's Handbook of Aeronautical Knowledge* (FAA-H-8083-25C) as 17 cited sections with active lessons, four question types, section quizzes, a module exam, spaced repetition, vocabulary, and calculation practice.
+Preflight is an iOS-first Expo/React Native microlearning app for the FAA Private Pilot written test. This MVP ships the complete _Pilot's Handbook of Aeronautical Knowledge_ (FAA-H-8083-25C) as 17 cited sections with active lessons, four question types, section quizzes, a module exam, spaced repetition, vocabulary, and calculation practice.
 
 ## Run the app
 

@@ -1,6 +1,15 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { BottomNav, Card, Eyebrow, Header, IconButton, Pill, PrimaryButton, Screen } from '@/components/ui';
+import {
+  BottomNav,
+  Card,
+  Eyebrow,
+  Header,
+  IconButton,
+  Pill,
+  PrimaryButton,
+  Screen,
+} from '@/components/ui';
 import { colors, fonts, type } from '@/theme';
 
 type PracticeRoute = 'daily' | 'vocabulary' | 'calculations';
@@ -21,25 +30,45 @@ export function PracticeScreen({
       contentStyle={styles.content}
       footer={<BottomNav active="practice" onPath={onPath} onPractice={() => undefined} />}
     >
-      <Header label="PRACTICE / HANGAR" trailing={<IconButton name="information-outline" accessibilityLabel="About Preflight" onPress={onInfo} />} />
+      <Header
+        label="PRACTICE / HANGAR"
+        trailing={
+          <IconButton
+            name="information-outline"
+            accessibilityLabel="About Preflight"
+            onPress={onInfo}
+          />
+        }
+      />
       <View style={styles.hero}>
         <Eyebrow>KEEP IT AIRWORTHY</Eyebrow>
         <Text style={type.title}>Practice</Text>
-        <Text style={type.body}>Short drills tuned to what you&apos;ve learned and what is due next.</Text>
+        <Text style={type.body}>
+          Short drills tuned to what you&apos;ve learned and what is due next.
+        </Text>
       </View>
 
       <Card style={styles.dailyCard} accent={colors.magenta}>
         <View style={styles.dailyHead}>
           <View style={styles.dailyIcon}>
-            <MaterialCommunityIcons name="calendar-refresh-outline" size={25} color={colors.magenta} />
+            <MaterialCommunityIcons
+              name="calendar-refresh-outline"
+              size={25}
+              color={colors.magenta}
+            />
           </View>
           <Pill tone="magenta">{dueCount ? 'DUE NOW' : 'CLEAR'}</Pill>
         </View>
         <Text style={styles.dailyTitle}>Daily review</Text>
         <Text style={styles.dailySub}>
-          {dueCount ? `${dueCount} cards · about ${Math.max(2, Math.ceil(dueCount / 2))} min` : 'Nothing due - fly a light recent-material review.'}
+          {dueCount
+            ? `${dueCount} cards · about ${Math.max(2, Math.ceil(dueCount / 2))} min`
+            : 'Nothing due - fly a light recent-material review.'}
         </Text>
-        <PrimaryButton label={dueCount ? 'START REVIEW' : 'QUICK REVIEW'} onPress={() => onOpen('daily')} />
+        <PrimaryButton
+          label={dueCount ? 'START REVIEW' : 'QUICK REVIEW'}
+          onPress={() => onOpen('daily')}
+        />
       </Card>
 
       <View style={styles.drillHeading}>
@@ -47,16 +76,36 @@ export function PracticeScreen({
         <Text style={styles.drillHint}>PRACTICE ANYTIME</Text>
       </View>
       <View style={styles.drills}>
-        <DrillCard icon="alphabetical-variant" name="Vocabulary" detail="Terms and definitions from the complete PHAK glossary" color={colors.blue} onPress={() => onOpen('vocabulary')} />
-        <DrillCard icon="calculator-variant-outline" name="Calculations" detail="W&B · crosswind · performance · weather" color={colors.green} onPress={() => onOpen('calculations')} />
-        <DrillCard icon="alert-circle-outline" name="Mistakes" detail="Misses are being collected for a future review mode" color={colors.muted} disabled />
+        <DrillCard
+          icon="alphabetical-variant"
+          name="Vocabulary"
+          detail="Terms and definitions from the complete PHAK glossary"
+          color={colors.blue}
+          onPress={() => onOpen('vocabulary')}
+        />
+        <DrillCard
+          icon="calculator-variant-outline"
+          name="Calculations"
+          detail="W&B · crosswind · performance · weather"
+          color={colors.green}
+          onPress={() => onOpen('calculations')}
+        />
+        <DrillCard
+          icon="alert-circle-outline"
+          name="Mistakes"
+          detail="Misses are being collected for a future review mode"
+          color={colors.muted}
+          disabled
+        />
       </View>
 
       <Card style={styles.fsrsCard}>
         <MaterialCommunityIcons name="brain" size={24} color={colors.blue} />
         <View style={styles.fsrsCopy}>
           <Text style={styles.fsrsTitle}>How review works</Text>
-          <Text style={styles.fsrsText}>Correct answers wait longer. Misses return sooner. The schedule stays on this device.</Text>
+          <Text style={styles.fsrsText}>
+            Correct answers wait longer. Misses return sooner. The schedule stays on this device.
+          </Text>
         </View>
       </Card>
     </Screen>
@@ -95,7 +144,11 @@ function DrillCard({
           <Text style={styles.drillName}>{name}</Text>
           <Text style={styles.drillDetail}>{detail}</Text>
         </View>
-        <MaterialCommunityIcons name={disabled ? 'lock-outline' : 'chevron-right'} size={24} color={colors.muted} />
+        <MaterialCommunityIcons
+          name={disabled ? 'lock-outline' : 'chevron-right'}
+          size={24}
+          color={colors.muted}
+        />
       </Card>
     </Pressable>
   );
@@ -106,20 +159,46 @@ const styles = StyleSheet.create({
   hero: { gap: 8, marginBottom: 24 },
   dailyCard: { gap: 12, borderWidth: 1.5 },
   dailyHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dailyIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.magentaPale, alignItems: 'center', justifyContent: 'center' },
+  dailyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.magentaPale,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dailyTitle: { ...type.heading, fontSize: 27 },
   dailySub: { ...type.small, marginTop: -7 },
-  drillHeading: { marginTop: 30, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  drillHeading: {
+    marginTop: 30,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   drillHint: { ...type.eyebrow, color: colors.blue },
   drills: { gap: 11 },
   pressed: { opacity: 0.72 },
   drillCard: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 15, shadowOpacity: 0 },
   disabled: { opacity: 0.55 },
-  drillIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  drillIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   drillCopy: { flex: 1, gap: 2 },
   drillName: { fontFamily: fonts.display, fontSize: 19, color: colors.ink },
   drillDetail: { ...type.small, fontSize: 13, lineHeight: 17 },
-  fsrsCard: { marginTop: 24, flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: colors.bluePale, shadowOpacity: 0 },
+  fsrsCard: {
+    marginTop: 24,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: colors.bluePale,
+    shadowOpacity: 0,
+  },
   fsrsCopy: { flex: 1, gap: 3 },
   fsrsTitle: { fontFamily: fonts.display, fontSize: 17, color: colors.ink },
   fsrsText: { ...type.small, color: colors.body },

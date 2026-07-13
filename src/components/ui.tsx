@@ -59,7 +59,13 @@ export function Screen({
   );
 }
 
-export function Eyebrow({ children, color = colors.muted }: { children: ReactNode; color?: string }) {
+export function Eyebrow({
+  children,
+  color = colors.muted,
+}: {
+  children: ReactNode;
+  color?: string;
+}) {
   return <Text style={[type.eyebrow, { color }]}>{children}</Text>;
 }
 
@@ -132,11 +138,12 @@ export function PrimaryButton({
   tone?: 'magenta' | 'ink' | 'quiet';
   icon?: IconName;
 }) {
-  const palette = tone === 'ink'
-    ? { bg: colors.ink, fg: colors.paper, shadow: colors.navy }
-    : tone === 'quiet'
-      ? { bg: colors.paperDeep, fg: colors.body, shadow: colors.lineStrong }
-      : { bg: colors.magenta, fg: colors.paper, shadow: colors.magentaDark };
+  const palette =
+    tone === 'ink'
+      ? { bg: colors.ink, fg: colors.paper, shadow: colors.navy }
+      : tone === 'quiet'
+        ? { bg: colors.paperDeep, fg: colors.body, shadow: colors.lineStrong }
+        : { bg: colors.magenta, fg: colors.paper, shadow: colors.magentaDark };
   const handlePress = () => {
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -157,8 +164,18 @@ export function PrimaryButton({
         <ActivityIndicator color={palette.fg} />
       ) : (
         <View style={styles.buttonLabelRow}>
-          {icon ? <MaterialCommunityIcons name={icon} size={19} color={disabled ? colors.muted : palette.fg} /> : null}
-          <Text style={[styles.primaryButtonLabel, { color: disabled ? colors.muted : palette.fg }]}>{label}</Text>
+          {icon ? (
+            <MaterialCommunityIcons
+              name={icon}
+              size={19}
+              color={disabled ? colors.muted : palette.fg}
+            />
+          ) : null}
+          <Text
+            style={[styles.primaryButtonLabel, { color: disabled ? colors.muted : palette.fg }]}
+          >
+            {label}
+          </Text>
         </View>
       )}
     </Pressable>
@@ -175,9 +192,7 @@ export function Card({
   accent?: string;
 }) {
   return (
-    <View style={[styles.card, accent ? { borderColor: accent } : null, style]}>
-      {children}
-    </View>
+    <View style={[styles.card, accent ? { borderColor: accent } : null, style]}>{children}</View>
   );
 }
 
@@ -232,7 +247,7 @@ export function BottomNav({
   onPath: () => void;
   onPractice: () => void;
 }) {
-  const items: Array<{ id: typeof active; label: string; icon: IconName; press: () => void }> = [
+  const items: { id: typeof active; label: string; icon: IconName; press: () => void }[] = [
     { id: 'path', label: 'Route', icon: 'map-marker-path', press: onPath },
     { id: 'practice', label: 'Practice', icon: 'cards-outline', press: onPractice },
   ];
@@ -252,7 +267,9 @@ export function BottomNav({
               size={22}
               color={active === item.id ? colors.magenta : colors.muted}
             />
-            <Text style={[styles.navLabel, active === item.id && styles.navLabelActive]}>{item.label}</Text>
+            <Text style={[styles.navLabel, active === item.id && styles.navLabelActive]}>
+              {item.label}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -275,20 +292,22 @@ export function Option({
   disabled?: boolean;
   onPress: () => void;
 }) {
-  const border = state === 'correct'
-    ? colors.green
-    : state === 'wrong'
-      ? colors.red
-      : selected
-        ? colors.magenta
-        : colors.line;
-  const background = state === 'correct'
-    ? colors.greenPale
-    : state === 'wrong'
-      ? colors.redPale
-      : selected
-        ? colors.magentaPale
-        : colors.paper;
+  const border =
+    state === 'correct'
+      ? colors.green
+      : state === 'wrong'
+        ? colors.red
+        : selected
+          ? colors.magenta
+          : colors.line;
+  const background =
+    state === 'correct'
+      ? colors.greenPale
+      : state === 'wrong'
+        ? colors.redPale
+        : selected
+          ? colors.magentaPale
+          : colors.paper;
   const icon = state === 'correct' ? 'check' : state === 'wrong' ? 'close' : undefined;
   return (
     <Pressable
@@ -317,7 +336,15 @@ export function Option({
   );
 }
 
-export function Feedback({ correct, title, children }: { correct: boolean; title: string; children: ReactNode }) {
+export function Feedback({
+  correct,
+  title,
+  children,
+}: {
+  correct: boolean;
+  title: string;
+  children: ReactNode;
+}) {
   const tone = correct ? colors.green : colors.red;
   return (
     <View
@@ -326,7 +353,11 @@ export function Feedback({ correct, title, children }: { correct: boolean; title
       accessibilityLiveRegion="polite"
     >
       <View style={styles.feedbackHead}>
-        <MaterialCommunityIcons name={correct ? 'check-circle-outline' : 'compass-off-outline'} size={20} color={tone} />
+        <MaterialCommunityIcons
+          name={correct ? 'check-circle-outline' : 'compass-off-outline'}
+          size={20}
+          color={tone}
+        />
         <Text style={[styles.feedbackTitle, { color: tone }]}>{title}</Text>
       </View>
       <Text style={styles.feedbackBody}>{children}</Text>
@@ -336,13 +367,24 @@ export function Feedback({ correct, title, children }: { correct: boolean; title
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
-  frame: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: colors.paper },
+  frame: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    backgroundColor: colors.paper,
+  },
   paperTexture: { opacity: 0.72 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 22, paddingBottom: 116 },
   staticContent: { flex: 1, paddingHorizontal: 22 },
   header: { paddingTop: 6, paddingBottom: 16 },
-  headerRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   headerTitle: { marginTop: 14 },
   headerSpacer: { width: 44, height: 44 },
   iconButton: {
@@ -377,11 +419,24 @@ const styles = StyleSheet.create({
     padding: 18,
     ...shadows.card,
   },
-  pill: { minHeight: 25, paddingHorizontal: 10, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  pill: {
+    minHeight: 25,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pillText: { fontFamily: fonts.strong, fontSize: 10, letterSpacing: 1.25 },
   segmentRow: { flexDirection: 'row', gap: 6, height: 5 },
   segment: { flex: 1, borderRadius: 4 },
-  navWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingBottom: Platform.OS === 'ios' ? 10 : 14 },
+  navWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 14,
+  },
   nav: {
     minHeight: 64,
     borderRadius: 20,
@@ -405,10 +460,29 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   optionMuted: { opacity: 0.55 },
-  optionMarker: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  optionMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   optionIndex: { fontFamily: fonts.display, fontSize: 14 },
-  optionLabel: { flex: 1, fontFamily: fonts.body, fontSize: 16, lineHeight: 21, color: colors.body },
-  feedback: { borderRadius: 12, borderWidth: 1.5, backgroundColor: colors.paper, padding: 15, gap: 8 },
+  optionLabel: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.body,
+  },
+  feedback: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: colors.paper,
+    padding: 15,
+    gap: 8,
+  },
   feedbackHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   feedbackTitle: { fontFamily: fonts.display, fontSize: 15, letterSpacing: 1.1 },
   feedbackBody: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.body },

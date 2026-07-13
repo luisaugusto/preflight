@@ -1,16 +1,13 @@
-import type { Lesson, ModuleContent, Section } from "./content/types";
+import type { Lesson, ModuleContent, Section } from './content/types';
 
 export interface CompletionLike {
   contentId: string;
   contentType?: string;
 }
 
-export type CompletionInput =
-  | ReadonlySet<string>
-  | readonly string[]
-  | readonly CompletionLike[];
+export type CompletionInput = ReadonlySet<string> | readonly string[] | readonly CompletionLike[];
 
-export type LearningStatus = "locked" | "available" | "inProgress" | "complete";
+export type LearningStatus = 'locked' | 'available' | 'inProgress' | 'complete';
 
 export interface SectionProgress {
   sectionId: string;
@@ -36,21 +33,19 @@ export function toCompletedIdSet(completions: CompletionInput): ReadonlySet<stri
   if (completions instanceof Set) return completions;
   const items = completions as readonly (string | CompletionLike)[];
   return new Set(
-    items.map((completion) =>
-      typeof completion === "string" ? completion : completion.contentId,
-    ),
+    items.map((completion) => (typeof completion === 'string' ? completion : completion.contentId)),
   );
 }
 
-export function orderedSections(module: Pick<ModuleContent, "sections">): Section[] {
+export function orderedSections(module: Pick<ModuleContent, 'sections'>): Section[] {
   return [...module.sections].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
-export function orderedLessons(section: Pick<Section, "lessons">): Lesson[] {
+export function orderedLessons(section: Pick<Section, 'lessons'>): Lesson[] {
   return [...section.lessons].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
-export function getLessonSequence(module: Pick<ModuleContent, "sections">): Lesson[] {
+export function getLessonSequence(module: Pick<ModuleContent, 'sections'>): Lesson[] {
   return orderedSections(module).flatMap(orderedLessons);
 }
 
@@ -66,7 +61,7 @@ export function isSectionComplete(section: Section, completions: CompletionInput
 }
 
 export function isSectionUnlocked(
-  module: Pick<ModuleContent, "sections">,
+  module: Pick<ModuleContent, 'sections'>,
   sectionId: string,
   completions: CompletionInput,
 ): boolean {
@@ -78,7 +73,7 @@ export function isSectionUnlocked(
 }
 
 export function isLessonUnlocked(
-  module: Pick<ModuleContent, "sections">,
+  module: Pick<ModuleContent, 'sections'>,
   lessonId: string,
   completions: CompletionInput,
 ): boolean {
@@ -109,13 +104,14 @@ export function calculateSectionProgress(
     sectionId: section.id,
     completedLessons,
     totalLessons: lessons.length,
-    percentage: lessons.length === 0 ? (isComplete ? 100 : 0) : (completedLessons / lessons.length) * 100,
+    percentage:
+      lessons.length === 0 ? (isComplete ? 100 : 0) : (completedLessons / lessons.length) * 100,
     isComplete,
   };
 }
 
 export function calculateModuleProgress(
-  module: Pick<ModuleContent, "id" | "sections">,
+  module: Pick<ModuleContent, 'id' | 'sections'>,
   completions: CompletionInput,
 ): ModuleProgress {
   const sections = orderedSections(module);
@@ -143,30 +139,30 @@ export function calculateModuleProgress(
 }
 
 export function getSectionStatus(
-  module: Pick<ModuleContent, "sections">,
+  module: Pick<ModuleContent, 'sections'>,
   sectionId: string,
   completions: CompletionInput,
 ): LearningStatus {
   const section = module.sections.find((candidate) => candidate.id === sectionId);
-  if (!section || !isSectionUnlocked(module, sectionId, completions)) return "locked";
+  if (!section || !isSectionUnlocked(module, sectionId, completions)) return 'locked';
   const progress = calculateSectionProgress(section, completions);
-  if (progress.isComplete) return "complete";
-  if (progress.completedLessons > 0) return "inProgress";
-  return "available";
+  if (progress.isComplete) return 'complete';
+  if (progress.completedLessons > 0) return 'inProgress';
+  return 'available';
 }
 
 export function getLessonStatus(
-  module: Pick<ModuleContent, "sections">,
+  module: Pick<ModuleContent, 'sections'>,
   lessonId: string,
   completions: CompletionInput,
 ): LearningStatus {
   const completed = toCompletedIdSet(completions);
-  if (completed.has(lessonId)) return "complete";
-  return isLessonUnlocked(module, lessonId, completed) ? "available" : "locked";
+  if (completed.has(lessonId)) return 'complete';
+  return isLessonUnlocked(module, lessonId, completed) ? 'available' : 'locked';
 }
 
 export function getNextLesson(
-  module: Pick<ModuleContent, "sections">,
+  module: Pick<ModuleContent, 'sections'>,
   completions: CompletionInput,
 ): Lesson | null {
   const completed = toCompletedIdSet(completions);
@@ -178,7 +174,7 @@ export function getNextLesson(
 }
 
 export function isModuleExamUnlocked(
-  module: Pick<ModuleContent, "id" | "sections">,
+  module: Pick<ModuleContent, 'id' | 'sections'>,
   completions: CompletionInput,
 ): boolean {
   return calculateModuleProgress(module, completions).isComplete;

@@ -35,7 +35,16 @@ import {
 } from '@/application/local-state';
 import { analytics } from '@/application/analytics';
 
-type AppRoute = 'home' | 'lesson' | 'sectionQuiz' | 'exam' | 'practice' | 'daily' | 'vocabulary' | 'calculations' | 'info';
+type AppRoute =
+  | 'home'
+  | 'lesson'
+  | 'sectionQuiz'
+  | 'exam'
+  | 'practice'
+  | 'daily'
+  | 'vocabulary'
+  | 'calculations'
+  | 'info';
 
 const bundledModule = phakContent as ModuleContent;
 
@@ -63,24 +72,30 @@ export function PreflightApp() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
-      loadLocalLearningState(),
-      createPreflightRepository().catch(() => null),
-    ])
+    Promise.all([loadLocalLearningState(), createPreflightRepository().catch(() => null)])
       .then(async ([state, repo]) => {
         if (!mounted) return;
         repository.current = repo;
         const databaseCompletions = repo ? await repo.listCompletions() : [];
-        const databaseLessons = databaseCompletions.filter((item) => item.contentType === 'lesson').map((item) => item.contentId);
-        const databaseSections = databaseCompletions.filter((item) => item.contentType === 'section').map((item) => item.contentId);
+        const databaseLessons = databaseCompletions
+          .filter((item) => item.contentType === 'lesson')
+          .map((item) => item.contentId);
+        const databaseSections = databaseCompletions
+          .filter((item) => item.contentType === 'section')
+          .map((item) => item.contentId);
         setOnboardingComplete(state.onboardingComplete);
         setCompletedLessonIds(new Set([...state.completedLessonIds, ...databaseLessons]));
         setCompletedSectionIds(new Set([...state.completedSectionIds, ...databaseSections]));
         if (repo) {
           const resume = await repo.getResumePosition(bundledModule.id);
-          if (resume?.contentVersion === bundledModule.version && resume.sectionId && resume.lessonId) {
+          if (
+            resume?.contentVersion === bundledModule.version &&
+            resume.sectionId &&
+            resume.lessonId
+          ) {
             const section = bundledModule.sections.find((item) => item.id === resume.sectionId);
-            const resumedLessonIndex = section?.lessons.findIndex((item) => item.id === resume.lessonId) ?? -1;
+            const resumedLessonIndex =
+              section?.lessons.findIndex((item) => item.id === resume.lessonId) ?? -1;
             if (section && resumedLessonIndex >= 0) {
               setActiveSectionId(section.id);
               setLessonIndex(resumedLessonIndex);
@@ -89,14 +104,18 @@ export function PreflightApp() {
             }
           }
           const due = await repo.listDueReviewCards(new Date(), 20);
-          setDueQuestionIds(due.filter((card) => card.contentType === 'question').map((card) => card.contentId));
+          setDueQuestionIds(
+            due.filter((card) => card.contentType === 'question').map((card) => card.contentId),
+          );
         }
       })
       .catch(() => {
         // A corrupt or unavailable local store must never block the bundled course.
       })
       .finally(() => mounted && setHydrated(true));
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -123,16 +142,22 @@ export function PreflightApp() {
         // Cached or bundled content remains active when a manifest is unavailable or invalid.
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const activeSection = useMemo(
-    () => moduleContent.sections.find((section) => section.id === activeSectionId) ?? moduleContent.sections[0],
+    () =>
+      moduleContent.sections.find((section) => section.id === activeSectionId) ??
+      moduleContent.sections[0],
     [activeSectionId, moduleContent],
   );
 
   const openSection = (section: Section) => {
-    const firstIncomplete = section.lessons.findIndex((lesson) => !completedLessonIds.has(lesson.id));
+    const firstIncomplete = section.lessons.findIndex(
+      (lesson) => !completedLessonIds.has(lesson.id),
+    );
     setActiveSectionId(section.id);
     if (firstIncomplete < 0 && !completedSectionIds.has(section.id)) {
       setResumePosition(null);
@@ -198,21 +223,30 @@ export function PreflightApp() {
     }
   };
 
-  const vocabularyQuestions = useMemo(() => buildVocabularyQuestions(moduleContent), [moduleContent]);
+  const vocabularyQuestions = useMemo(
+    () => buildVocabularyQuestions(moduleContent),
+    [moduleContent],
+  );
   const vocabularyDrillQuestions = useMemo(
     () => selectQuestionWindow(vocabularyQuestions, vocabularyOffset, 10),
     [vocabularyOffset, vocabularyQuestions],
   );
-  const calculationQuestions = useMemo(() => buildCalculationQuestions(moduleContent), [moduleContent]);
+  const calculationQuestions = useMemo(
+    () => buildCalculationQuestions(moduleContent),
+    [moduleContent],
+  );
 
-  const reviewableQuestions = useMemo(() => [
-    ...moduleContent.sections.flatMap((section) => [
-      ...section.lessons.map((lesson) => lesson.practice),
-      ...section.quiz,
-    ]),
-    ...moduleContent.exam,
-    ...vocabularyQuestions,
-  ], [moduleContent, vocabularyQuestions]);
+  const reviewableQuestions = useMemo(
+    () => [
+      ...moduleContent.sections.flatMap((section) => [
+        ...section.lessons.map((lesson) => lesson.practice),
+        ...section.quiz,
+      ]),
+      ...moduleContent.exam,
+      ...vocabularyQuestions,
+    ],
+    [moduleContent, vocabularyQuestions],
+  );
 
   const dueQuestions = useMemo(() => {
     const byId = new Map(reviewableQuestions.map((question) => [question.id, question]));
@@ -223,10 +257,13 @@ export function PreflightApp() {
 
   const dailyQuestions = useMemo(() => {
     if (dueQuestions.length) return dueQuestions.slice(0, 8);
-    const learned = moduleContent.sections.flatMap((section) => section.lessons)
+    const learned = moduleContent.sections
+      .flatMap((section) => section.lessons)
       .filter((lesson) => completedLessonIds.has(lesson.id))
       .map((lesson) => lesson.practice);
-    const fallback = moduleContent.sections.flatMap((section) => section.lessons.map((lesson) => lesson.practice));
+    const fallback = moduleContent.sections.flatMap((section) =>
+      section.lessons.map((lesson) => lesson.practice),
+    );
     return (learned.length ? learned : fallback).slice(0, 8);
   }, [completedLessonIds, dueQuestions, moduleContent]);
 
@@ -255,7 +292,9 @@ export function PreflightApp() {
       const review = scheduleReview(current, answerOutcomeToRating(correct));
       await repo.saveReview(review.card, review.log);
       const due = await repo.listDueReviewCards(new Date(), 20);
-      setDueQuestionIds(due.filter((card) => card.contentType === 'question').map((card) => card.contentId));
+      setDueQuestionIds(
+        due.filter((card) => card.contentType === 'question').map((card) => card.contentId),
+      );
     })().catch(() => {
       // A local persistence failure must not interrupt the learning flow.
     });
@@ -312,7 +351,11 @@ export function PreflightApp() {
           void repository.current?.saveResumePosition(nextResume);
         }}
         onComplete={(correct) => {
-          recordQuestionResult(activeSection.lessons[lessonIndex].practice, correct, activeSection.id);
+          recordQuestionResult(
+            activeSection.lessons[lessonIndex].practice,
+            correct,
+            activeSection.id,
+          );
           completeLesson();
         }}
       />
@@ -347,7 +390,9 @@ export function PreflightApp() {
           }
           setRoute('home');
         }}
-        onQuestionAnswered={(question, correct) => recordQuestionResult(question, correct, activeSection.id)}
+        onQuestionAnswered={(question, correct) =>
+          recordQuestionResult(question, correct, activeSection.id)
+        }
       />
     );
   }
@@ -438,7 +483,9 @@ export function PreflightApp() {
         schedulesReview={false}
         onExit={() => setRoute('practice')}
         onFinish={() => setRoute('practice')}
-        onQuestionAnswered={(question, correct) => recordQuestionResult(question, correct, undefined, false)}
+        onQuestionAnswered={(question, correct) =>
+          recordQuestionResult(question, correct, undefined, false)
+        }
       />
     );
   }
@@ -465,7 +512,20 @@ function LoadingScreen() {
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 15, backgroundColor: colors.paper },
-  loadingMark: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.magenta },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 15,
+    backgroundColor: colors.paper,
+  },
+  loadingMark: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.magenta,
+  },
   loadingBrand: { fontFamily: fonts.display, fontSize: 36, color: colors.ink },
 });

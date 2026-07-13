@@ -2,7 +2,15 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { QuestionInteraction } from '@/components/question-interaction';
-import { Card, Eyebrow, Header, Pill, PrimaryButton, Screen, SegmentedProgress } from '@/components/ui';
+import {
+  Card,
+  Eyebrow,
+  Header,
+  Pill,
+  PrimaryButton,
+  Screen,
+  SegmentedProgress,
+} from '@/components/ui';
 import type { Lesson, Section } from '@/lib/content/types';
 import { colors, fonts, type } from '@/theme';
 
@@ -41,7 +49,15 @@ export function LessonScreen({
       <SegmentedProgress current={stage + 1} total={totalStages} />
 
       <View style={styles.lessonHead}>
-        <Eyebrow>{stage === 0 ? 'CONCEPT' : stage === 1 ? 'WORKED EXAMPLE' : stage === 2 ? 'YOUR TURN' : 'LEG COMPLETE'}</Eyebrow>
+        <Eyebrow>
+          {stage === 0
+            ? 'CONCEPT'
+            : stage === 1
+              ? 'WORKED EXAMPLE'
+              : stage === 2
+                ? 'YOUR TURN'
+                : 'LEG COMPLETE'}
+        </Eyebrow>
         <Text style={styles.lessonTitle}>{lesson.title}</Text>
       </View>
 
@@ -70,7 +86,9 @@ export function LessonScreen({
           </Card>
           <View style={styles.tipRow}>
             <MaterialCommunityIcons name="compass-outline" size={19} color={colors.blue} />
-            <Text style={styles.tip}>The written changes the numbers and wording. Keep the relationship, not the answer.</Text>
+            <Text style={styles.tip}>
+              The written changes the numbers and wording. Keep the relationship, not the answer.
+            </Text>
           </View>
           <PrimaryButton label="TRY ONE" onPress={() => moveToStage(2)} />
         </View>
@@ -78,6 +96,7 @@ export function LessonScreen({
 
       {stage === 2 ? (
         <QuestionInteraction
+          key={lesson.practice.id}
           question={lesson.practice}
           continueLabel="STAMP THIS LESSON"
           onComplete={(correct) => {
@@ -92,19 +111,30 @@ export function LessonScreen({
           <View style={styles.stamp}>
             <MaterialCommunityIcons name="airplane-check" size={42} color={colors.paper} />
           </View>
-          <Text style={styles.completeTitle}>{practiceCorrect ? 'Clean landing.' : 'Lesson logged.'}</Text>
+          <Text style={styles.completeTitle}>
+            {practiceCorrect ? 'Clean landing.' : 'Lesson logged.'}
+          </Text>
           <Text style={styles.completeText}>
             {practiceCorrect
               ? 'You understood the concept on the first pass. It will return in daily review.'
               : 'This concept is marked for an earlier review. Keep moving - repetition will do its job.'}
           </Text>
           <Card style={styles.sourceCard}>
-            <MaterialCommunityIcons name="book-open-page-variant-outline" size={20} color={colors.muted} />
+            <MaterialCommunityIcons
+              name="book-open-page-variant-outline"
+              size={20}
+              color={colors.muted}
+            />
             <Text style={styles.sourceText}>
-              Source: {lesson.practice.sourceCitation.handbook}, chapter {lesson.practice.sourceCitation.chapter}, page {lesson.practice.sourceCitation.page}
+              Source: {lesson.practice.sourceCitation.handbook}, chapter{' '}
+              {lesson.practice.sourceCitation.chapter}, page {lesson.practice.sourceCitation.page}
             </Text>
           </Card>
-          <PrimaryButton label="NEXT LEG" icon="arrow-right" onPress={() => onComplete(practiceCorrect)} />
+          <PrimaryButton
+            label="NEXT LEG"
+            icon="arrow-right"
+            onPress={() => onComplete(practiceCorrect)}
+          />
         </View>
       ) : null}
     </Screen>
@@ -117,7 +147,14 @@ const styles = StyleSheet.create({
   lessonTitle: { ...type.title, fontSize: 34 },
   stageWrap: { gap: 18 },
   conceptCard: { gap: 16, padding: 20, borderWidth: 1.5 },
-  cardIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bluePale },
+  cardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bluePale,
+  },
   concept: { fontFamily: fonts.display, fontSize: 23, lineHeight: 28, color: colors.ink },
   rule: { height: 1, backgroundColor: colors.line },
   explanation: { ...type.body },
@@ -127,9 +164,24 @@ const styles = StyleSheet.create({
   tipRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 3 },
   tip: { ...type.small, flex: 1 },
   completeWrap: { alignItems: 'center', gap: 18, paddingTop: 26 },
-  stamp: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.green, borderWidth: 7, borderColor: colors.greenPale },
+  stamp: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.green,
+    borderWidth: 7,
+    borderColor: colors.greenPale,
+  },
   completeTitle: { ...type.title, textAlign: 'center' },
   completeText: { ...type.body, textAlign: 'center', maxWidth: 360 },
-  sourceCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, shadowOpacity: 0 },
+  sourceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    shadowOpacity: 0,
+  },
   sourceText: { ...type.small, flex: 1 },
 });

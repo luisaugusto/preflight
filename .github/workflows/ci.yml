@@ -1,7 +1,7 @@
 name: CI
 
 # With no analytics or crash reporting in the MVP, this workflow is the only
-# automated regression safety net. It runs the repo's four existing checks on
+# automated regression safety net. It runs the repo's quality checks on
 # every pull request and on every push to main; any failure is a red, blocking
 # status.
 on:
@@ -37,15 +37,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       # Clean, reproducible install from the lockfile (not `npm install`).
       - name: Install dependencies
         run: npm ci
 
-      # Four checks as separate steps so a red status names the failing gate.
+      # Each check is a separate step so a red status names the failing gate.
       - name: Typecheck
         run: npm run typecheck
+
+      # ESLint runs Expo's flat config (TypeScript + React Hooks rules) and fails
+      # on any warning, so exhaustive-deps and unused-code issues block the merge
+      # instead of piling up. `--max-warnings=0` lives in the npm script.
+      - name: Lint
+        run: npm run lint
+
+      # Prettier is the single source of truth for formatting; `--check` reports
+      # drift and never rewrites files in CI.
+      - name: Format check
+        run: npm run format:check
 
       - name: Unit tests
         run: npm test
