@@ -25,10 +25,31 @@ The app uses Expo Router and ships its initial content and figures in the binary
 npm run typecheck
 npm test
 npm run content:validate
+npm run secrets:check
 npx expo-doctor
 ```
 
 The latest product-design comparison and verification notes are in [design-qa.md](./design-qa.md).
+
+## Security
+
+Two automated, blocking checks run on every pull request and every push to `main` ([.github/workflows/secret-scan.yml](./.github/workflows/secret-scan.yml)) so secrets never reach the client bundle or the git history:
+
+- **[gitleaks](https://github.com/gitleaks/gitleaks)** scans the working tree and full commit history using its default ruleset plus this repo's custom rules in [.gitleaks.toml](./.gitleaks.toml).
+- **An `EXPO_PUBLIC_` token guard** ([scripts/ci/check-expo-public-secrets.sh](./scripts/ci/check-expo-public-secrets.sh)) fails the build if a token-like value is assigned to any `EXPO_PUBLIC_*` variable. Expo inlines every `EXPO_PUBLIC_*` value into the client bundle at build time, so a secret placed there ships to every device and is readable straight from the IPA — the exact footgun called out under [Sanity Studio](#sanity-studio) above.
+
+Run the checks locally:
+
+```sh
+npm run secrets:check                        # the EXPO_PUBLIC_ guard
+npm run secrets:check -- --selftest          # prove the guard's rules still fire
+gitleaks dir --config .gitleaks.toml .       # working tree
+gitleaks git --config .gitleaks.toml .       # full history
+```
+
+`.env` is gitignored; only the `*.env.example` templates (with empty secret values) are tracked. Removing a leaked token in a later commit does **not** un-leak it — if a real `SANITY_AUTH_TOKEN` is ever committed, rotate it in Sanity immediately.
+
+As a defense-in-depth complement to the CI gate, enable GitHub's native **secret scanning** and **push protection** for this repository under **Settings → Code security** (free for public repositories). Push protection blocks a recognized secret at `git push`, before it ever reaches the remote.
 
 ## Content pipeline
 

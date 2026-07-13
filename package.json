@@ -62,6 +62,7 @@
     "test:watch": "jest --watch",
     "content:validate": "node scripts/content/validate-content.mjs",
     "content:extract": "python3 scripts/content/extract_phak.py",
+    "secrets:check": "bash scripts/ci/check-expo-public-secrets.sh",
     "studio": "npm --prefix studio run dev",
     "studio:deploy-schema": "npm --prefix studio run schema:deploy"
   },
