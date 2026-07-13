@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.luisaugusto.preflight"
+      "bundleIdentifier": "com.luisaugusto.preflight",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -43,7 +46,16 @@
       "sanityProjectId": "4qoowg94",
       "sanityDataset": "production",
       "sanityApiVersion": "2026-07-12",
-      "contentManifestUrl": "https://cdn.sanity.io/files/4qoowg94/production/dddd69d5f8b6101a0029948feb654703ad42f5a3.json"
+      "contentManifestUrl": "https://cdn.sanity.io/files/4qoowg94/production/dddd69d5f8b6101a0029948feb654703ad42f5a3.json",
+      "router": {
+        "headers": {
+          "Cross-Origin-Embedder-Policy": "credentialless",
+          "Cross-Origin-Opener-Policy": "same-origin"
+        }
+      },
+      "eas": {
+        "projectId": "54d0e795-a938-4800-b7a6-81dc4f0f6fb3"
+      }
     }
   }
 }
