@@ -15,7 +15,9 @@ describe('practice question builders', () => {
       expect(question.type).toBe('multipleChoice');
       if (question.type !== 'multipleChoice') return;
       expect(question.options).toHaveLength(4);
-      expect(new Set(question.options.map((option) => option.trim().toLocaleLowerCase('en-US'))).size).toBe(4);
+      expect(
+        new Set(question.options.map((option) => option.trim().toLocaleLowerCase('en-US'))).size,
+      ).toBe(4);
       expect(question.options[question.correctIndex]).toBe(question.explanation);
     });
   });

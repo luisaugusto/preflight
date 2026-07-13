@@ -80,4 +80,3 @@ export const type = {
     color: colors.muted,
   } satisfies TextStyle,
 } as const;
-

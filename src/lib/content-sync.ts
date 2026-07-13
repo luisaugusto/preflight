@@ -1,13 +1,8 @@
-import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
-import { Directory, File, Paths } from "expo-file-system";
-import { z } from "zod";
+import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
+import { Directory, File, Paths } from 'expo-file-system';
+import { z } from 'zod';
 
-import type {
-  ContentBundle,
-  ModuleContent,
-  Question,
-  SourceCitation,
-} from "./content/types";
+import type { ContentBundle, ModuleContent, Question, SourceCitation } from './content/types';
 
 const nonEmptyString = z.string().trim().min(1);
 const contentIdSchema = nonEmptyString.max(200);
@@ -35,7 +30,7 @@ const questionBaseShape = {
 const multipleChoiceQuestionSchema = z
   .object({
     ...questionBaseShape,
-    type: z.literal("multipleChoice"),
+    type: z.literal('multipleChoice'),
     options: z.array(nonEmptyString).min(2),
     correctIndex: z.number().int().nonnegative(),
   })
@@ -44,7 +39,7 @@ const multipleChoiceQuestionSchema = z
 const imageQuestionSchema = z
   .object({
     ...questionBaseShape,
-    type: z.literal("image"),
+    type: z.literal('image'),
     image: z
       .object({
         uri: nonEmptyString,
@@ -61,7 +56,7 @@ const imageQuestionSchema = z
 const numericQuestionSchema = z
   .object({
     ...questionBaseShape,
-    type: z.literal("numeric"),
+    type: z.literal('numeric'),
     answer: z
       .object({
         value: z.number().finite(),
@@ -76,7 +71,7 @@ const numericQuestionSchema = z
 const matchingQuestionSchema = z
   .object({
     ...questionBaseShape,
-    type: z.literal("matching"),
+    type: z.literal('matching'),
     pairs: z
       .array(
         z
@@ -92,7 +87,7 @@ const matchingQuestionSchema = z
   .strict();
 
 export const questionSchema: z.ZodType<Question> = z
-  .discriminatedUnion("type", [
+  .discriminatedUnion('type', [
     multipleChoiceQuestionSchema,
     numericQuestionSchema,
     matchingQuestionSchema,
@@ -100,24 +95,32 @@ export const questionSchema: z.ZodType<Question> = z
   ])
   .superRefine((question, context) => {
     if (
-      (question.type === "multipleChoice" || question.type === "image") &&
+      (question.type === 'multipleChoice' || question.type === 'image') &&
       question.correctIndex >= question.options.length
     ) {
       context.addIssue({
-        code: "custom",
-        path: ["correctIndex"],
-        message: "correctIndex must refer to an option",
+        code: 'custom',
+        path: ['correctIndex'],
+        message: 'correctIndex must refer to an option',
       });
     }
-    if (question.type === "matching") {
+    if (question.type === 'matching') {
       const ids = new Set<string>();
       const leftValues = new Set<string>();
       question.pairs.forEach((pair, index) => {
         if (ids.has(pair.id)) {
-          context.addIssue({ code: "custom", path: ["pairs", index, "id"], message: "Duplicate pair id" });
+          context.addIssue({
+            code: 'custom',
+            path: ['pairs', index, 'id'],
+            message: 'Duplicate pair id',
+          });
         }
         if (leftValues.has(pair.left)) {
-          context.addIssue({ code: "custom", path: ["pairs", index, "left"], message: "Duplicate left value" });
+          context.addIssue({
+            code: 'custom',
+            path: ['pairs', index, 'left'],
+            message: 'Duplicate left value',
+          });
         }
         ids.add(pair.id);
         leftValues.add(pair.left);
@@ -193,7 +196,7 @@ export const moduleContentSchema: z.ZodType<ModuleContent> = z
       const existing = entityIds.get(id);
       if (existing) {
         context.addIssue({
-          code: "custom",
+          code: 'custom',
           path,
           message: `Duplicate content id; already used by ${existing}`,
         });
@@ -202,53 +205,67 @@ export const moduleContentSchema: z.ZodType<ModuleContent> = z
       }
     };
     const checkQuestion = (question: Question, path: (string | number)[]) => {
-      checkEntityId(question.id, [...path, "id"], "question");
+      checkEntityId(question.id, [...path, 'id'], 'question');
       if (questionIds.has(question.id)) {
-        context.addIssue({ code: "custom", path: [...path, "id"], message: "Duplicate question id" });
+        context.addIssue({
+          code: 'custom',
+          path: [...path, 'id'],
+          message: 'Duplicate question id',
+        });
       }
       questionIds.add(question.id);
     };
 
-    checkEntityId(module.id, ["id"], "module");
+    checkEntityId(module.id, ['id'], 'module');
     const orders = new Set<number>();
     module.sections.forEach((section, sectionIndex) => {
-      checkEntityId(section.id, ["sections", sectionIndex, "id"], "section");
+      checkEntityId(section.id, ['sections', sectionIndex, 'id'], 'section');
       if (orders.has(section.order)) {
         context.addIssue({
-          code: "custom",
-          path: ["sections", sectionIndex, "order"],
-          message: "Section order values must be unique",
+          code: 'custom',
+          path: ['sections', sectionIndex, 'order'],
+          message: 'Section order values must be unique',
         });
       }
       orders.add(section.order);
 
       const lessonOrders = new Set<number>();
       section.lessons.forEach((lesson, lessonIndex) => {
-        checkEntityId(lesson.id, ["sections", sectionIndex, "lessons", lessonIndex, "id"], "lesson");
+        checkEntityId(
+          lesson.id,
+          ['sections', sectionIndex, 'lessons', lessonIndex, 'id'],
+          'lesson',
+        );
         if (lessonOrders.has(lesson.order)) {
           context.addIssue({
-            code: "custom",
-            path: ["sections", sectionIndex, "lessons", lessonIndex, "order"],
-            message: "Lesson order values must be unique within a section",
+            code: 'custom',
+            path: ['sections', sectionIndex, 'lessons', lessonIndex, 'order'],
+            message: 'Lesson order values must be unique within a section',
           });
         }
         lessonOrders.add(lesson.order);
-        checkQuestion(lesson.practice, ["sections", sectionIndex, "lessons", lessonIndex, "practice"]);
+        checkQuestion(lesson.practice, [
+          'sections',
+          sectionIndex,
+          'lessons',
+          lessonIndex,
+          'practice',
+        ]);
       });
       section.quiz.forEach((question, questionIndex) =>
-        checkQuestion(question, ["sections", sectionIndex, "quiz", questionIndex]),
+        checkQuestion(question, ['sections', sectionIndex, 'quiz', questionIndex]),
       );
     });
     module.exam.forEach((question, questionIndex) =>
-      checkQuestion(question, ["exam", questionIndex]),
+      checkQuestion(question, ['exam', questionIndex]),
     );
     module.glossary.forEach((term, termIndex) => {
-      checkEntityId(term.id, ["glossary", termIndex, "id"], "glossary term");
+      checkEntityId(term.id, ['glossary', termIndex, 'id'], 'glossary term');
       if (!sectionIds.has(term.sectionId)) {
         context.addIssue({
-          code: "custom",
-          path: ["glossary", termIndex, "sectionId"],
-          message: "Glossary sectionId must refer to a section in this module",
+          code: 'custom',
+          path: ['glossary', termIndex, 'sectionId'],
+          message: 'Glossary sectionId must refer to a section in this module',
         });
       }
     });
@@ -265,9 +282,9 @@ export const contentBundleSchema: z.ZodType<ContentBundle> = z
   .superRefine((bundle, context) => {
     if (bundle.contentVersion !== bundle.module.version) {
       context.addIssue({
-        code: "custom",
-        path: ["contentVersion"],
-        message: "contentVersion must match module.version",
+        code: 'custom',
+        path: ['contentVersion'],
+        message: 'contentVersion must match module.version',
       });
     }
   });
@@ -279,12 +296,13 @@ export function normalizeContent(input: unknown): ModuleContent {
   const bundle = contentBundleSchema.safeParse(input);
   if (bundle.success) return bundle.data.module;
 
-  if (input && typeof input === "object" && "module" in input) {
+  if (input && typeof input === 'object' && 'module' in input) {
     return moduleContentSchema.parse((input as { module: unknown }).module);
   }
-  if (input && typeof input === "object" && "modules" in input) {
+  if (input && typeof input === 'object' && 'modules' in input) {
     const modules = (input as { modules: unknown }).modules;
-    if (Array.isArray(modules) && modules.length === 1) return moduleContentSchema.parse(modules[0]);
+    if (Array.isArray(modules) && modules.length === 1)
+      return moduleContentSchema.parse(modules[0]);
   }
 
   // Return the most relevant canonical error to make bad generated content easy to diagnose.
@@ -295,9 +313,9 @@ export function parseModuleContent(input: unknown): ModuleContent {
   return normalizeContent(input);
 }
 
-export function safeParseModuleContent(input: unknown):
-  | { success: true; data: ModuleContent }
-  | { success: false; error: z.ZodError } {
+export function safeParseModuleContent(
+  input: unknown,
+): { success: true; data: ModuleContent } | { success: false; error: z.ZodError } {
   try {
     return { success: true, data: normalizeContent(input) };
   } catch (error) {
@@ -312,7 +330,7 @@ export interface ContentManifest {
   contentVersion: string;
   bundleUrl: string;
   checksum: string;
-  algorithm: "sha256";
+  algorithm: 'sha256';
   byteLength?: number;
   createdAt: string;
 }
@@ -323,8 +341,8 @@ export const contentManifestSchema: z.ZodType<ContentManifest> = z
     moduleId: contentIdSchema,
     contentVersion: nonEmptyString,
     bundleUrl: z.string().url(),
-    checksum: z.string().regex(/^[a-fA-F0-9]{64}$/, "Expected a SHA-256 checksum"),
-    algorithm: z.literal("sha256"),
+    checksum: z.string().regex(/^[a-fA-F0-9]{64}$/, 'Expected a SHA-256 checksum'),
+    algorithm: z.literal('sha256'),
     byteLength: z.number().int().positive().optional(),
     createdAt: z.string().datetime({ offset: true }),
   })
@@ -344,7 +362,7 @@ export interface ContentStore {
   clearStaged(): Promise<void>;
 }
 
-export type ContentUpdateStatus = "updated" | "upToDate" | "rolledBack" | "failed";
+export type ContentUpdateStatus = 'updated' | 'upToDate' | 'rolledBack' | 'failed';
 
 export interface ContentUpdateResult {
   status: ContentUpdateStatus;
@@ -375,31 +393,32 @@ export async function validateContentPayload(
 ): Promise<StoredContent> {
   const manifest = contentManifestSchema.parse(manifestInput);
   if (manifest.byteLength !== undefined && utf8ByteLength(raw) !== manifest.byteLength) {
-    throw new Error("Downloaded content byte length does not match the manifest");
+    throw new Error('Downloaded content byte length does not match the manifest');
   }
   const actualChecksum = (await hash(raw)).toLowerCase();
   if (actualChecksum !== manifest.checksum.toLowerCase()) {
-    throw new Error("Downloaded content checksum does not match the manifest");
+    throw new Error('Downloaded content checksum does not match the manifest');
   }
 
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new Error("Downloaded content is not valid JSON");
+    throw new Error('Downloaded content is not valid JSON');
   }
   const module = normalizeContent(json);
-  if (module.id !== manifest.moduleId) throw new Error("Downloaded module id does not match the manifest");
+  if (module.id !== manifest.moduleId)
+    throw new Error('Downloaded module id does not match the manifest');
   if (module.version !== manifest.contentVersion) {
-    throw new Error("Downloaded content version does not match the manifest");
+    throw new Error('Downloaded content version does not match the manifest');
   }
   return { manifest, raw, module };
 }
 
 function versionParts(value: string): number[] | null {
-  const normalized = value.trim().replace(/^v/i, "");
+  const normalized = value.trim().replace(/^v/i, '');
   if (!/^\d+(?:\.\d+)*$/.test(normalized)) return null;
-  return normalized.split(".").map(Number);
+  return normalized.split('.').map(Number);
 }
 
 export function compareContentVersions(left: string, right: string): number {
@@ -413,7 +432,7 @@ export function compareContentVersions(left: string, right: string): number {
     }
     return 0;
   }
-  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
 }
 
 async function defaultDownloadText(url: string): Promise<string> {
@@ -440,7 +459,7 @@ export async function updateContentFromManifest(
       active = await dependencies.store.readActive();
     } catch {
       return {
-        status: "failed",
+        status: 'failed',
         active: null,
         error: `Unable to read active content: ${errorMessage(readError)}`,
       };
@@ -453,7 +472,7 @@ export async function updateContentFromManifest(
     const manifest = contentManifestSchema.parse(manifestInput);
     if (!dependencies.force && active) {
       if (manifest.moduleId !== active.module.id) {
-        throw new Error("Remote manifest module id does not match active content");
+        throw new Error('Remote manifest module id does not match active content');
       }
       const sameRelease =
         active.manifest.checksum.toLowerCase() === manifest.checksum.toLowerCase() &&
@@ -461,7 +480,7 @@ export async function updateContentFromManifest(
       const isOlder =
         compareContentVersions(manifest.contentVersion, active.manifest.contentVersion) < 0;
       if (sameRelease || isOlder) {
-        return { status: "upToDate", active, previousVersion };
+        return { status: 'upToDate', active, previousVersion };
       }
     }
 
@@ -472,22 +491,22 @@ export async function updateContentFromManifest(
     await dependencies.store.activate();
     active = await dependencies.store.readActive();
     if (!active || active.manifest.checksum.toLowerCase() !== manifest.checksum.toLowerCase()) {
-      throw new Error("Content activation verification failed");
+      throw new Error('Content activation verification failed');
     }
-    return { status: "updated", active, previousVersion };
+    return { status: 'updated', active, previousVersion };
   } catch (error) {
     await dependencies.store.clearStaged().catch(() => undefined);
     if (activationStarted) {
       await dependencies.store.rollback().catch(() => undefined);
       active = await dependencies.store.readActive().catch(() => null);
       return {
-        status: active ? "rolledBack" : "failed",
+        status: active ? 'rolledBack' : 'failed',
         active,
         previousVersion,
         error: errorMessage(error),
       };
     }
-    return { status: "failed", active, previousVersion, error: errorMessage(error) };
+    return { status: 'failed', active, previousVersion, error: errorMessage(error) };
   }
 }
 
@@ -499,7 +518,7 @@ export async function fetchContentManifest(url: string): Promise<ContentManifest
 
 export async function syncContent(
   manifestUrl: string,
-  dependencies: Omit<ContentUpdateDependencies, "store"> & { store: ContentStore },
+  dependencies: Omit<ContentUpdateDependencies, 'store'> & { store: ContentStore },
 ): Promise<ContentUpdateResult> {
   const manifest = await fetchContentManifest(manifestUrl);
   return updateContentFromManifest(manifest, dependencies);
@@ -525,11 +544,11 @@ export class MemoryContentStore implements ContentStore {
   }
 
   async activate(): Promise<void> {
-    if (!this.staged) throw new Error("No content has been staged");
+    if (!this.staged) throw new Error('No content has been staged');
     this.previous = this.active;
     this.active = this.staged;
     this.staged = null;
-    if (this.failActivation) throw new Error("Simulated content activation failure");
+    if (this.failActivation) throw new Error('Simulated content activation failure');
   }
 
   async rollback(): Promise<void> {
@@ -555,7 +574,7 @@ interface StoredFileEnvelope {
 export class ExpoFileContentStore implements ContentStore {
   private readonly directory: Directory;
 
-  constructor(directory: Directory = new Directory(Paths.document, "preflight-content")) {
+  constructor(directory: Directory = new Directory(Paths.document, 'preflight-content')) {
     this.directory = directory;
   }
 
@@ -563,11 +582,11 @@ export class ExpoFileContentStore implements ContentStore {
     this.directory.create({ idempotent: true, intermediates: true });
   }
 
-  private file(slot: "active" | "previous" | "staged"): File {
+  private file(slot: 'active' | 'previous' | 'staged'): File {
     return new File(this.directory, `${slot}.json`);
   }
 
-  private async readSlot(slot: "active" | "previous" | "staged"): Promise<StoredContent | null> {
+  private async readSlot(slot: 'active' | 'previous' | 'staged'): Promise<StoredContent | null> {
     this.ensureDirectory();
     const file = this.file(slot);
     if (!file.exists) return null;
@@ -576,44 +595,44 @@ export class ExpoFileContentStore implements ContentStore {
   }
 
   async readActive(): Promise<StoredContent | null> {
-    return this.readSlot("active");
+    return this.readSlot('active');
   }
 
   async stage(candidate: StoredContent): Promise<void> {
     this.ensureDirectory();
-    const staged = this.file("staged");
+    const staged = this.file('staged');
     if (!staged.exists) staged.create({ intermediates: true });
     staged.write(JSON.stringify({ manifest: candidate.manifest, raw: candidate.raw }));
-    const verified = await this.readSlot("staged");
+    const verified = await this.readSlot('staged');
     if (!verified || verified.manifest.checksum !== candidate.manifest.checksum) {
-      throw new Error("Staged content verification failed");
+      throw new Error('Staged content verification failed');
     }
   }
 
   async activate(): Promise<void> {
     this.ensureDirectory();
-    const staged = this.file("staged");
-    if (!staged.exists) throw new Error("No content has been staged");
-    const active = this.file("active");
-    const previous = this.file("previous");
+    const staged = this.file('staged');
+    if (!staged.exists) throw new Error('No content has been staged');
+    const active = this.file('active');
+    const previous = this.file('previous');
     if (previous.exists) previous.delete();
     if (active.exists) await active.move(previous, { overwrite: true });
     // Leave `previous` in place if this move throws; the updater owns rollback.
-    await staged.move(this.file("active"), { overwrite: true });
+    await staged.move(this.file('active'), { overwrite: true });
   }
 
   async rollback(): Promise<void> {
     this.ensureDirectory();
-    const active = this.file("active");
-    const previous = this.file("previous");
+    const active = this.file('active');
+    const previous = this.file('previous');
     if (active.exists) active.delete();
-    if (previous.exists) await previous.move(this.file("active"), { overwrite: true });
+    if (previous.exists) await previous.move(this.file('active'), { overwrite: true });
     await this.clearStaged();
   }
 
   async clearStaged(): Promise<void> {
     this.ensureDirectory();
-    const staged = this.file("staged");
+    const staged = this.file('staged');
     if (staged.exists) staged.delete();
   }
 }

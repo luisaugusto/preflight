@@ -4,18 +4,18 @@
 // the detailed content, source, ID, answer, ACS, and asset checks to the
 // dependency-free Python validator beside this file.
 
-import { spawnSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { spawnSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(scriptDirectory, "../..");
-const validator = resolve(scriptDirectory, "validate_bundle.py");
-const bundle = resolve(projectRoot, "src/content/phak.json");
+const projectRoot = resolve(scriptDirectory, '../..');
+const validator = resolve(scriptDirectory, 'validate_bundle.py');
+const bundle = resolve(projectRoot, 'src/content/phak.json');
 
-const result = spawnSync("python3", [validator, bundle], {
+const result = spawnSync('python3', [validator, bundle], {
   cwd: projectRoot,
-  stdio: "inherit",
+  stdio: 'inherit',
 });
 
 if (result.error) {
@@ -24,4 +24,3 @@ if (result.error) {
 }
 
 process.exit(result.status ?? 1);
-

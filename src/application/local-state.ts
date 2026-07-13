@@ -35,10 +35,7 @@ export async function loadLocalLearningState(): Promise<LocalLearningState> {
 }
 
 export async function saveOnboarding(timeline: string): Promise<void> {
-  await Promise.all([
-    setItem(KEYS.onboarding, 'true'),
-    setItem(KEYS.timeline, timeline),
-  ]);
+  await Promise.all([setItem(KEYS.onboarding, 'true'), setItem(KEYS.timeline, timeline)]);
 }
 
 export async function saveCompletedLessons(ids: ReadonlySet<string>): Promise<void> {
@@ -72,7 +69,9 @@ function parseStringArray(value: string | null): string[] {
   if (!value) return [];
   try {
     const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
   } catch {
     return [];
   }

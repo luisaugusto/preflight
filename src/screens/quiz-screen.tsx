@@ -2,7 +2,15 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { QuestionInteraction } from '@/components/question-interaction';
-import { Card, Eyebrow, Header, Pill, PrimaryButton, Screen, SegmentedProgress } from '@/components/ui';
+import {
+  Card,
+  Eyebrow,
+  Header,
+  Pill,
+  PrimaryButton,
+  Screen,
+  SegmentedProgress,
+} from '@/components/ui';
 import type { Question } from '@/lib/content/types';
 import { colors, fonts, type } from '@/theme';
 
@@ -22,7 +30,12 @@ export function QuizScreen({
   passThreshold?: number;
   schedulesReview?: boolean;
   onExit: () => void;
-  onFinish: (result: { score: number; total: number; passed: boolean; missedQuestionIds: string[] }) => void;
+  onFinish: (result: {
+    score: number;
+    total: number;
+    passed: boolean;
+    missedQuestionIds: string[];
+  }) => void;
   onQuestionAnswered?: (question: Question, correct: boolean) => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -32,13 +45,18 @@ export function QuizScreen({
   const question = questions[index];
   const passed = score / questions.length >= passThreshold;
   const percentage = Math.round((score / questions.length) * 100);
-  const questionTypes = useMemo(() => new Set(questions.map((item) => item.type)).size, [questions]);
+  const questionTypes = useMemo(
+    () => new Set(questions.map((item) => item.type)).size,
+    [questions],
+  );
 
   if (!question) {
     return (
       <Screen>
         <Header label={label} onBack={onExit} />
-        <Card><Text style={type.body}>No questions are available for this check yet.</Text></Card>
+        <Card>
+          <Text style={type.body}>No questions are available for this check yet.</Text>
+        </Card>
       </Screen>
     );
   }
@@ -48,11 +66,18 @@ export function QuizScreen({
       <Screen contentStyle={styles.resultsContent}>
         <Header label="CHECK COMPLETE" onBack={onExit} />
         <View style={styles.resultsHero}>
-          <View style={[styles.scoreRoundel, { backgroundColor: passed ? colors.green : colors.magenta }]}> 
+          <View
+            style={[
+              styles.scoreRoundel,
+              { backgroundColor: passed ? colors.green : colors.magenta },
+            ]}
+          >
             <Text style={styles.scoreNumber}>{percentage}</Text>
             <Text style={styles.scoreUnit}>%</Text>
           </View>
-          <Eyebrow color={passed ? colors.green : colors.magenta}>{passed ? 'CLEARED' : 'ONE MORE PATTERN'}</Eyebrow>
+          <Eyebrow color={passed ? colors.green : colors.magenta}>
+            {passed ? 'CLEARED' : 'ONE MORE PATTERN'}
+          </Eyebrow>
           <Text style={styles.resultTitle}>{passed ? 'Textbook.' : 'Good grind.'}</Text>
           <Text style={styles.resultBody}>
             {passed
@@ -62,7 +87,11 @@ export function QuizScreen({
         </View>
         <Card style={styles.reviewCard} accent={missed.length ? colors.magenta : colors.green}>
           <View style={styles.reviewHead}>
-            <MaterialCommunityIcons name={missed.length ? 'cards-outline' : 'check-decagram-outline'} size={23} color={missed.length ? colors.magenta : colors.green} />
+            <MaterialCommunityIcons
+              name={missed.length ? 'cards-outline' : 'check-decagram-outline'}
+              size={23}
+              color={missed.length ? colors.magenta : colors.green}
+            />
             <Text style={styles.reviewTitle}>
               {missed.length
                 ? schedulesReview
@@ -83,7 +112,9 @@ export function QuizScreen({
         </Card>
         <PrimaryButton
           label={passed ? 'BACK TO THE ROUTE' : 'REVIEW THE ROUTE'}
-          onPress={() => onFinish({ score, total: questions.length, passed, missedQuestionIds: missed })}
+          onPress={() =>
+            onFinish({ score, total: questions.length, passed, missedQuestionIds: missed })
+          }
         />
       </Screen>
     );
@@ -94,11 +125,23 @@ export function QuizScreen({
       <Header
         label={label}
         onBack={onExit}
-        trailing={<Pill tone="magenta">Q{index + 1}/{questions.length}</Pill>}
+        trailing={
+          <Pill tone="magenta">
+            Q{index + 1}/{questions.length}
+          </Pill>
+        }
       />
       <SegmentedProgress current={index + 1} total={questions.length} />
       <View style={styles.quizHead}>
-        <Eyebrow>{question.type === 'multipleChoice' ? 'MULTIPLE CHOICE' : question.type === 'numeric' ? 'CALCULATE' : question.type === 'matching' ? 'CONNECT' : 'READ THE FIGURE'}</Eyebrow>
+        <Eyebrow>
+          {question.type === 'multipleChoice'
+            ? 'MULTIPLE CHOICE'
+            : question.type === 'numeric'
+              ? 'CALCULATE'
+              : question.type === 'matching'
+                ? 'CONNECT'
+                : 'READ THE FIGURE'}
+        </Eyebrow>
         <Text style={styles.quizTitle}>{title}</Text>
       </View>
       <QuestionInteraction
@@ -125,7 +168,17 @@ const styles = StyleSheet.create({
   quizTitle: { ...type.small, fontFamily: fonts.strong, color: colors.ink },
   resultsContent: { paddingBottom: 38 },
   resultsHero: { alignItems: 'center', gap: 9, marginTop: 22, marginBottom: 26 },
-  scoreRoundel: { width: 116, height: 116, borderRadius: 58, borderWidth: 9, borderColor: colors.paperDeep, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 12 },
+  scoreRoundel: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    borderWidth: 9,
+    borderColor: colors.paperDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
   scoreNumber: { fontFamily: fonts.display, fontSize: 43, color: colors.paper },
   scoreUnit: { fontFamily: fonts.strong, fontSize: 15, color: colors.paper, marginTop: 16 },
   resultTitle: { ...type.title, textAlign: 'center' },

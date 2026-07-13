@@ -6,21 +6,21 @@ import {
   type Card,
   type FSRSParameters,
   type Grade,
-} from "ts-fsrs";
+} from 'ts-fsrs';
 
-import type { ReviewableContentType } from "./content/types";
-import type { ReviewCardRecord, ReviewLogRecord } from "./db";
+import type { ReviewableContentType } from './content/types';
+import type { ReviewCardRecord, ReviewLogRecord } from './db';
 
-export type FsrsRating = "again" | "hard" | "good" | "easy";
-export type AnswerConfidence = "low" | "medium" | "high";
+export type FsrsRating = 'again' | 'hard' | 'good' | 'easy';
+export type AnswerConfidence = 'low' | 'medium' | 'high';
 
 export const DEFAULT_FSRS_PARAMETERS: Partial<FSRSParameters> = {
   request_retention: 0.9,
   maximum_interval: 36500,
   enable_fuzz: true,
   enable_short_term: true,
-  learning_steps: ["1m", "10m"],
-  relearning_steps: ["10m"],
+  learning_steps: ['1m', '10m'],
+  relearning_steps: ['10m'],
 };
 
 export interface FsrsReviewResult {
@@ -39,7 +39,7 @@ export type ReviewPreviews = Record<FsrsRating, ReviewPreview>;
 
 function validDate(value: string | Date): Date {
   const date = value instanceof Date ? new Date(value) : new Date(value);
-  if (Number.isNaN(date.getTime())) throw new TypeError("Expected a valid review date");
+  if (Number.isNaN(date.getTime())) throw new TypeError('Expected a valid review date');
   return date;
 }
 
@@ -54,9 +54,9 @@ function assertStoredCard(card: ReviewCardRecord): void {
     card.lapses,
     card.state,
   ];
-  if (!numbers.every(Number.isFinite)) throw new TypeError("Review card contains invalid numbers");
+  if (!numbers.every(Number.isFinite)) throw new TypeError('Review card contains invalid numbers');
   if (![State.New, State.Learning, State.Review, State.Relearning].includes(card.state)) {
-    throw new RangeError("Review card contains an invalid FSRS state");
+    throw new RangeError('Review card contains an invalid FSRS state');
   }
   validDate(card.due);
   if (card.lastReview) validDate(card.lastReview);
@@ -80,7 +80,7 @@ export function toFsrsCard(card: ReviewCardRecord): Card {
 
 export function fromFsrsCard(
   card: Card,
-  identity: Pick<ReviewCardRecord, "contentId" | "contentType">,
+  identity: Pick<ReviewCardRecord, 'contentId' | 'contentType'>,
   updatedAt: string | Date = new Date(),
 ): ReviewCardRecord {
   return {
@@ -110,18 +110,18 @@ export function createReviewCard(
 }
 
 export function ratingToGrade(rating: FsrsRating | Grade): Grade {
-  if (typeof rating === "number") {
+  if (typeof rating === 'number') {
     if ([Rating.Again, Rating.Hard, Rating.Good, Rating.Easy].includes(rating)) return rating;
-    throw new RangeError("FSRS grade must be Again, Hard, Good, or Easy");
+    throw new RangeError('FSRS grade must be Again, Hard, Good, or Easy');
   }
   switch (rating) {
-    case "again":
+    case 'again':
       return Rating.Again;
-    case "hard":
+    case 'hard':
       return Rating.Hard;
-    case "good":
+    case 'good':
       return Rating.Good;
-    case "easy":
+    case 'easy':
       return Rating.Easy;
   }
 }
@@ -129,13 +129,13 @@ export function ratingToGrade(rating: FsrsRating | Grade): Grade {
 function gradeToRating(grade: Grade): FsrsRating {
   switch (grade) {
     case Rating.Again:
-      return "again";
+      return 'again';
     case Rating.Hard:
-      return "hard";
+      return 'hard';
     case Rating.Good:
-      return "good";
+      return 'good';
     case Rating.Easy:
-      return "easy";
+      return 'easy';
   }
 }
 
@@ -200,19 +200,19 @@ export interface AnswerReviewOutcome {
 /** Map an answer result into an FSRS grade without inventing a user confidence. */
 export function answerOutcomeToRating(outcome: boolean | AnswerReviewOutcome): FsrsRating {
   const normalized: AnswerReviewOutcome =
-    typeof outcome === "boolean" ? { isCorrect: outcome } : outcome;
-  if (!normalized.isCorrect) return "again";
-  if (normalized.confidence === "low") return "hard";
-  if (normalized.confidence === "high") return "easy";
+    typeof outcome === 'boolean' ? { isCorrect: outcome } : outcome;
+  if (!normalized.isCorrect) return 'again';
+  if (normalized.confidence === 'low') return 'hard';
+  if (normalized.confidence === 'high') return 'easy';
   if (
     normalized.score !== undefined &&
     normalized.maxScore !== undefined &&
     normalized.maxScore > 0 &&
     normalized.score / normalized.maxScore < 0.75
   ) {
-    return "hard";
+    return 'hard';
   }
-  return "good";
+  return 'good';
 }
 
 export function getRetrievability(
@@ -224,7 +224,10 @@ export function getRetrievability(
   return scheduler.get_retrievability(toFsrsCard(card), validDate(now), false);
 }
 
-export function isReviewDue(card: Pick<ReviewCardRecord, "due">, now: string | Date = new Date()): boolean {
+export function isReviewDue(
+  card: Pick<ReviewCardRecord, 'due'>,
+  now: string | Date = new Date(),
+): boolean {
   return validDate(card.due).getTime() <= validDate(now).getTime();
 }
 
@@ -233,4 +236,3 @@ export function sortReviewCardsByDue(cards: readonly ReviewCardRecord[]): Review
     (left, right) => validDate(left.due).getTime() - validDate(right.due).getTime(),
   );
 }
-
