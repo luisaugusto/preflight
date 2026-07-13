@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out the commit that passed CI
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # workflow_run defaults to the tip of the default branch; pin the
           # checkout — and everything we report on below — to the exact commit
@@ -51,7 +51,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -64,15 +64,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Installs eas-cli and authenticates the CLI via EXPO_TOKEN.
-      - name: Set up EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - name: Mark the commit's preview build as pending
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
@@ -97,7 +90,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          eas build \
+          npx eas-cli@latest build \
             --platform ios \
             --profile preview \
             --non-interactive \
@@ -116,7 +109,7 @@ jobs:
 
       - name: Report the finished build on the commit
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -141,7 +134,7 @@ jobs:
       # sends its standard failed-run notification to the actor.
       - name: Report the failed build on the commit
         if: failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
