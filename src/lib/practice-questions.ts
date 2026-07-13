@@ -57,7 +57,8 @@ export function selectQuestionWindow<T>(
   size: number,
 ): T[] {
   if (!questions.length || size <= 0) return [];
-  const normalizedOffset = ((Math.trunc(offset) % questions.length) + questions.length) % questions.length;
+  const normalizedOffset =
+    ((Math.trunc(offset) % questions.length) + questions.length) % questions.length;
   const count = Math.min(Math.trunc(size), questions.length);
   return Array.from(
     { length: count },

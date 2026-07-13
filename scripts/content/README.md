@@ -1,7 +1,7 @@
 # PHAK content pipeline
 
 This pipeline pins, extracts, builds, and validates the first Preflight module
-from the official FAA *Pilot's Handbook of Aeronautical Knowledge*,
+from the official FAA _Pilot's Handbook of Aeronautical Knowledge_,
 FAA-H-8083-25C.
 
 ## Rebuild
@@ -37,4 +37,3 @@ outputs are `src/content/phak.json` and the 17 optimized page crops under
   and image questions.
 - Every assessed answer has an explanation and source citation.
 - Stable IDs make regeneration idempotent for app progress and CMS imports.
-

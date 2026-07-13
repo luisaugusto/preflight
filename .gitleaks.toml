@@ -1,0 +1,40 @@
+# Gitleaks configuration for Preflight.
+#
+# Extends the upstream default ruleset (which already detects a wide range of
+# provider tokens, private keys, and high-entropy secrets) and adds rules that
+# target this repo's documented footgun: a secret assigned to an EXPO_PUBLIC_*
+# variable. Expo inlines every EXPO_PUBLIC_* value into the client bundle at
+# build time, so any token placed there ships to every device and can be read
+# straight out of the IPA. See the README ("Sanity Studio" section).
+#
+# Run locally:
+#   gitleaks dir --config .gitleaks.toml .     # scan the working tree
+#   gitleaks git --config .gitleaks.toml .     # scan the full commit history
+
+title = "Preflight gitleaks config"
+
+[extend]
+# Keep every upstream rule, then add the project-specific ones below.
+useDefault = true
+
+[[rules]]
+id = "expo-public-secret-var"
+description = "Secret-suggesting value assigned to an EXPO_PUBLIC_ variable (inlined into the client bundle)"
+# EXPO_PUBLIC_<name containing TOKEN/SECRET/KEY/PASSWORD/AUTH/...> = <non-empty value>
+regex = '''(?i)EXPO_PUBLIC_[A-Z0-9_]*(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|AUTH|CREDENTIAL|PRIVATE)[A-Z0-9_]*\s*[:=]\s*["']?[^\s"'#]{6,}'''
+keywords = ["expo_public_"]
+
+[[rules]]
+id = "expo-public-sanity-token"
+description = "Sanity auth token (sk...) assigned to an EXPO_PUBLIC_ variable"
+# Any EXPO_PUBLIC_ variable whose value starts with a Sanity-style sk token.
+regex = '''(?i)EXPO_PUBLIC_[A-Z0-9_]*\s*[:=]\s*["']?(sk(?:_(?:test|live|prod))?[-_]?[A-Za-z0-9]{10,})'''
+keywords = ["expo_public_"]
+
+[allowlist]
+description = "Ignore the scanner's own config/workflow/docs so their rule text does not self-match"
+paths = [
+  '''\.gitleaks\.toml''',
+  '''\.github/workflows/secret-scan\.yml''',
+  '''scripts/ci/check-expo-public-secrets\.sh''',
+]

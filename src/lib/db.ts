@@ -1,12 +1,9 @@
-import { randomUUID } from "expo-crypto";
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import { randomUUID } from 'expo-crypto';
+import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
-import type {
-  ContentEntityType,
-  ReviewableContentType,
-} from "./content/types";
+import type { ContentEntityType, ReviewableContentType } from './content/types';
 
-export const PREFLIGHT_DATABASE_NAME = "preflight.db";
+export const PREFLIGHT_DATABASE_NAME = 'preflight.db';
 export const PREFLIGHT_DATABASE_VERSION = 1;
 
 const MIGRATIONS: readonly string[] = [
@@ -108,8 +105,8 @@ const MIGRATIONS: readonly string[] = [
 ];
 
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
-  await db.execAsync("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
-  const versionRow = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
+  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  const versionRow = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const currentVersion = versionRow?.user_version ?? 0;
   if (currentVersion > PREFLIGHT_DATABASE_VERSION) {
     throw new Error(
@@ -138,7 +135,7 @@ export async function openPreflightDatabase(
 
 function toIso(value: string | Date | undefined): string {
   const date = value === undefined ? new Date() : value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) throw new TypeError("Expected a valid date");
+  if (Number.isNaN(date.getTime())) throw new TypeError('Expected a valid date');
   return date.toISOString();
 }
 
@@ -459,11 +456,11 @@ export class PreflightRepository {
   ): Promise<CompletionRecord | null> {
     const row = contentType
       ? await this.db.getFirstAsync<CompletionRow>(
-          "SELECT * FROM completions WHERE content_id = ? AND content_type = ?",
+          'SELECT * FROM completions WHERE content_id = ? AND content_type = ?',
           [contentId, contentType],
         )
       : await this.db.getFirstAsync<CompletionRow>(
-          "SELECT * FROM completions WHERE content_id = ? ORDER BY completed_at DESC LIMIT 1",
+          'SELECT * FROM completions WHERE content_id = ? ORDER BY completed_at DESC LIMIT 1',
           [contentId],
         );
     return row ? completionFromRow(row) : null;
@@ -472,31 +469,31 @@ export class PreflightRepository {
   async listCompletions(contentType?: ContentEntityType): Promise<CompletionRecord[]> {
     const rows = contentType
       ? await this.db.getAllAsync<CompletionRow>(
-          "SELECT * FROM completions WHERE content_type = ? ORDER BY completed_at",
+          'SELECT * FROM completions WHERE content_type = ? ORDER BY completed_at',
           [contentType],
         )
-      : await this.db.getAllAsync<CompletionRow>("SELECT * FROM completions ORDER BY completed_at");
+      : await this.db.getAllAsync<CompletionRow>('SELECT * FROM completions ORDER BY completed_at');
     return rows.map(completionFromRow);
   }
 
   async removeCompletion(contentId: string, contentType?: ContentEntityType): Promise<void> {
     if (contentType) {
-      await this.db.runAsync(
-        "DELETE FROM completions WHERE content_id = ? AND content_type = ?",
-        [contentId, contentType],
-      );
+      await this.db.runAsync('DELETE FROM completions WHERE content_id = ? AND content_type = ?', [
+        contentId,
+        contentType,
+      ]);
     } else {
-      await this.db.runAsync("DELETE FROM completions WHERE content_id = ?", [contentId]);
+      await this.db.runAsync('DELETE FROM completions WHERE content_id = ?', [contentId]);
     }
   }
 
   async recordAttempt(input: RecordAttemptInput): Promise<AttemptRecord> {
     if (!Number.isFinite(input.score) || !Number.isFinite(input.maxScore ?? 1)) {
-      throw new TypeError("Attempt scores must be finite numbers");
+      throw new TypeError('Attempt scores must be finite numbers');
     }
     const maxScore = input.maxScore ?? 1;
     if (maxScore <= 0 || input.score < 0 || input.score > maxScore) {
-      throw new RangeError("Attempt score must be between zero and maxScore");
+      throw new RangeError('Attempt score must be between zero and maxScore');
     }
     const id = input.id ?? randomUUID();
     const attemptedAt = toIso(input.attemptedAt);
@@ -523,7 +520,7 @@ export class PreflightRepository {
 
       if (input.isCorrect) {
         await this.db.runAsync(
-          "UPDATE mistakes SET resolved_at = ?, last_attempt_at = ? WHERE question_id = ?",
+          'UPDATE mistakes SET resolved_at = ?, last_attempt_at = ? WHERE question_id = ?',
           [attemptedAt, attemptedAt, input.questionId],
         );
       } else {
@@ -570,17 +567,17 @@ export class PreflightRepository {
     let rows: AttemptRow[];
     if (query.questionId) {
       rows = await this.db.getAllAsync<AttemptRow>(
-        "SELECT * FROM attempts WHERE question_id = ? ORDER BY attempted_at DESC LIMIT ?",
+        'SELECT * FROM attempts WHERE question_id = ? ORDER BY attempted_at DESC LIMIT ?',
         [query.questionId, limit],
       );
     } else if (query.sectionId) {
       rows = await this.db.getAllAsync<AttemptRow>(
-        "SELECT * FROM attempts WHERE section_id = ? ORDER BY attempted_at DESC LIMIT ?",
+        'SELECT * FROM attempts WHERE section_id = ? ORDER BY attempted_at DESC LIMIT ?',
         [query.sectionId, limit],
       );
     } else {
       rows = await this.db.getAllAsync<AttemptRow>(
-        "SELECT * FROM attempts ORDER BY attempted_at DESC LIMIT ?",
+        'SELECT * FROM attempts ORDER BY attempted_at DESC LIMIT ?',
         [limit],
       );
     }
@@ -590,16 +587,16 @@ export class PreflightRepository {
   async listMistakes(unresolvedOnly = true): Promise<MistakeRecord[]> {
     const rows = unresolvedOnly
       ? await this.db.getAllAsync<MistakeRow>(
-          "SELECT * FROM mistakes WHERE resolved_at IS NULL ORDER BY last_attempt_at DESC",
+          'SELECT * FROM mistakes WHERE resolved_at IS NULL ORDER BY last_attempt_at DESC',
         )
       : await this.db.getAllAsync<MistakeRow>(
-          "SELECT * FROM mistakes ORDER BY last_attempt_at DESC",
+          'SELECT * FROM mistakes ORDER BY last_attempt_at DESC',
         );
     return rows.map(mistakeFromRow);
   }
 
   async resolveMistake(questionId: string, resolvedAt?: string | Date): Promise<void> {
-    await this.db.runAsync("UPDATE mistakes SET resolved_at = ? WHERE question_id = ?", [
+    await this.db.runAsync('UPDATE mistakes SET resolved_at = ? WHERE question_id = ?', [
       toIso(resolvedAt),
       questionId,
     ]);
@@ -608,7 +605,7 @@ export class PreflightRepository {
   async saveResumePosition(input: SaveResumePositionInput): Promise<ResumePosition> {
     const blockIndex = input.blockIndex ?? 0;
     if (!Number.isInteger(blockIndex) || blockIndex < 0) {
-      throw new RangeError("blockIndex must be a non-negative integer");
+      throw new RangeError('blockIndex must be a non-negative integer');
     }
     const updatedAt = toIso(input.updatedAt);
     await this.db.runAsync(
@@ -642,7 +639,7 @@ export class PreflightRepository {
 
   async getResumePosition(moduleId: string): Promise<ResumePosition | null> {
     const row = await this.db.getFirstAsync<ResumeRow>(
-      "SELECT * FROM resume_positions WHERE module_id = ?",
+      'SELECT * FROM resume_positions WHERE module_id = ?',
       [moduleId],
     );
     return row
@@ -658,7 +655,7 @@ export class PreflightRepository {
   }
 
   async clearResumePosition(moduleId: string): Promise<void> {
-    await this.db.runAsync("DELETE FROM resume_positions WHERE module_id = ?", [moduleId]);
+    await this.db.runAsync('DELETE FROM resume_positions WHERE module_id = ?', [moduleId]);
   }
 
   async saveContentState(input: SaveContentStateInput): Promise<ContentStateRecord> {
@@ -674,13 +671,7 @@ export class PreflightRepository {
         previous_version = excluded.previous_version,
         manifest_json = excluded.manifest_json,
         updated_at = excluded.updated_at`,
-      [
-        input.version,
-        input.checksum,
-        input.previousVersion ?? null,
-        manifestJson,
-        updatedAt,
-      ],
+      [input.version, input.checksum, input.previousVersion ?? null, manifestJson, updatedAt],
     );
     return {
       version: input.version,
@@ -748,11 +739,11 @@ export class PreflightRepository {
   ): Promise<ReviewCardRecord | null> {
     const row = contentType
       ? await this.db.getFirstAsync<ReviewCardRow>(
-          "SELECT * FROM review_cards WHERE content_id = ? AND content_type = ?",
+          'SELECT * FROM review_cards WHERE content_id = ? AND content_type = ?',
           [contentId, contentType],
         )
       : await this.db.getFirstAsync<ReviewCardRow>(
-          "SELECT * FROM review_cards WHERE content_id = ? LIMIT 1",
+          'SELECT * FROM review_cards WHERE content_id = ? LIMIT 1',
           [contentId],
         );
     return row ? reviewCardFromRow(row) : null;
@@ -764,7 +755,7 @@ export class PreflightRepository {
   ): Promise<ReviewCardRecord[]> {
     const safeLimit = Math.min(1000, Math.max(1, Math.trunc(limit)));
     const rows = await this.db.getAllAsync<ReviewCardRow>(
-      "SELECT * FROM review_cards WHERE due <= ? ORDER BY due LIMIT ?",
+      'SELECT * FROM review_cards WHERE due <= ? ORDER BY due LIMIT ?',
       [toIso(now), safeLimit],
     );
     return rows.map(reviewCardFromRow);
@@ -815,4 +806,3 @@ export async function createPreflightRepository(
 ): Promise<PreflightRepository> {
   return new PreflightRepository(await openPreflightDatabase(databaseName));
 }
-

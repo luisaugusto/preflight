@@ -27,9 +27,12 @@ export function OnboardingScreen({ onComplete }: { onComplete: (timeline: string
         </View>
         <View style={styles.welcomeCopy}>
           <Eyebrow color={colors.magenta}>PREFLIGHT</Eyebrow>
-          <Text style={styles.tagline}>CHART YOUR{`\n`}COURSE TO THE{`\n`}CHECKRIDE.</Text>
+          <Text style={styles.tagline}>
+            CHART YOUR{`\n`}COURSE TO THE{`\n`}CHECKRIDE.
+          </Text>
           <Text style={styles.intro}>
-            The four FAA handbooks, replotted as short, active lessons. Fly the route a leg a day - understand it, don&apos;t memorize it.
+            The four FAA handbooks, replotted as short, active lessons. Fly the route a leg a day -
+            understand it, don&apos;t memorize it.
           </Text>
         </View>
         <PrimaryButton label="OPEN THE CHART" onPress={() => setStep(1)} />
@@ -45,7 +48,9 @@ export function OnboardingScreen({ onComplete }: { onComplete: (timeline: string
         </View>
         <Eyebrow color={colors.magenta}>FLIGHT PLAN · 1 OF 1</Eyebrow>
         <Text style={type.title}>When are you taking the written?</Text>
-        <Text style={type.body}>We&apos;ll use this to pace the route. You can change it later.</Text>
+        <Text style={type.body}>
+          We&apos;ll use this to pace the route. You can change it later.
+        </Text>
       </View>
       <View style={styles.timelineOptions}>
         {timelines.map((item) => {
@@ -71,7 +76,11 @@ export function OnboardingScreen({ onComplete }: { onComplete: (timeline: string
           );
         })}
       </View>
-      <PrimaryButton label="FILE & DEPART" disabled={!selected} onPress={() => onComplete(selected)} />
+      <PrimaryButton
+        label="FILE & DEPART"
+        disabled={!selected}
+        onPress={() => onComplete(selected)}
+      />
     </Screen>
   );
 }
@@ -81,15 +90,43 @@ const styles = StyleSheet.create({
   routeGraphic: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
   routeDash: { flex: 1, borderTopWidth: 1.5, borderStyle: 'dashed', marginHorizontal: 7 },
   welcomeCopy: { gap: 15 },
-  tagline: { fontFamily: fonts.display, fontSize: 40, lineHeight: 43, color: colors.ink, letterSpacing: -0.4 },
+  tagline: {
+    fontFamily: fonts.display,
+    fontSize: 40,
+    lineHeight: 43,
+    color: colors.ink,
+    letterSpacing: -0.4,
+  },
   intro: { ...type.body, maxWidth: 360, color: colors.muted },
   timelineContent: { paddingTop: 26, gap: 26 },
   timelineHeader: { gap: 13 },
-  miniMark: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.magenta },
+  miniMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.magenta,
+  },
   timelineOptions: { gap: 11 },
-  timelineCard: { flexDirection: 'row', alignItems: 'center', padding: 15, gap: 13, shadowOpacity: 0 },
+  timelineCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    gap: 13,
+    shadowOpacity: 0,
+  },
   timelineCardActive: { borderColor: colors.magenta, backgroundColor: colors.magentaPale },
-  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  radio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.lineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   radioActive: { borderColor: colors.magenta },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.magenta },
   timelineText: { flex: 1, gap: 2 },
