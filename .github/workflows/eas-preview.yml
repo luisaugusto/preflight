@@ -14,7 +14,7 @@ name: EAS Preview Build
 # on pull requests.
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ['CI']
     types:
       - completed
     branches:
@@ -54,10 +54,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      # Installs eas-cli and authenticates via EXPO_TOKEN. The build runs
-      # remotely on EAS, so the app's dependencies are installed there — there is
-      # no need to `npm ci` the project on this runner.
+      # The remote build compiles on EAS, but eas-cli still resolves this
+      # project's Expo app config (its config plugins) and metro.config.js
+      # locally before uploading, and both read from node_modules. Without a
+      # clean install the build fails with MODULE_NOT_FOUND before it is even
+      # queued, so install dependencies first — same `npm ci` the CI gate runs.
+      - name: Install dependencies
+        run: npm ci
+
+      # Installs eas-cli and authenticates the CLI via EXPO_TOKEN.
       - name: Set up EAS
         uses: expo/expo-github-action@v8
         with:
