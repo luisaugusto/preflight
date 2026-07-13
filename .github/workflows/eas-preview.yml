@@ -1,0 +1,148 @@
+name: EAS Preview Build
+
+# Post-merge iOS preview build.
+#
+# This is triggered by the "CI" workflow *completing on main* (workflow_run) and
+# is gated on that run having succeeded. A commit therefore only reaches EAS
+# after it has passed the very same typecheck / unit tests / content validation /
+# expo-doctor gate that guards every pull request. That is the literal reading of
+# the task's "gate it behind the CI job so you never burn build minutes on a
+# broken commit": a plain `on: push` trigger would race the checks rather than
+# wait for them, whereas workflow_run only fires once CI has a verdict.
+#
+# EAS free-tier builds are metered, so this runs once per merged commit and never
+# on pull requests.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+# The only thing this workflow writes is a commit status reporting the build
+# outcome (and the artifact link) back onto the merged commit.
+permissions:
+  contents: read
+  statuses: write
+
+# One preview build per commit; don't stack duplicate builds for the same SHA.
+concurrency:
+  group: eas-preview-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: iOS preview build
+    runs-on: ubuntu-latest
+    # Build only a commit whose quality gate went green. A failed, cancelled, or
+    # timed-out CI run leaves no build behind, so build minutes are never spent
+    # on a broken commit.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Bound the wait so a stuck build can't hold a runner (and quota) all day.
+    timeout-minutes: 60
+    steps:
+      - name: Check out the commit that passed CI
+        uses: actions/checkout@v4
+        with:
+          # workflow_run defaults to the tip of the default branch; pin the
+          # checkout — and everything we report on below — to the exact commit
+          # the quality gate validated and that we are building.
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Installs eas-cli and authenticates via EXPO_TOKEN. The build runs
+      # remotely on EAS, so the app's dependencies are installed there — there is
+      # no need to `npm ci` the project on this runner.
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Mark the commit's preview build as pending
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.workflow_run.head_sha,
+              state: 'pending',
+              context: 'EAS preview build (iOS)',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: 'Preview build running…',
+            });
+
+      # Wait for the build (deliberately no --no-wait): the acceptance criteria
+      # need the finished artifact link on the commit AND a hard failure signal,
+      # and neither exists until the build resolves. --json makes the CLI emit the
+      # final build object we parse for the artifact URL; a non-zero exit — or a
+      # non-FINISHED status — fails the job, which turns the commit status red and
+      # fires GitHub's default failed-run notification (see the failure step
+      # below). --no-wait would return before any of that is known.
+      - name: Run EAS preview build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          eas build \
+            --platform ios \
+            --profile preview \
+            --non-interactive \
+            --json \
+            > eas-build.json
+          status="$(jq -r 'if type == "array" then .[0] else . end | .status' eas-build.json)"
+          echo "EAS build status: ${status}"
+          case "${status}" in
+            FINISHED | finished) ;;
+            *)
+              echo "::error::EAS build did not finish successfully (status: ${status})."
+              cat eas-build.json
+              exit 1
+              ;;
+          esac
+
+      - name: Report the finished build on the commit
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = JSON.parse(fs.readFileSync('eas-build.json', 'utf8'));
+            const build = Array.isArray(raw) ? raw[0] : raw;
+            const artifactUrl =
+              build?.artifacts?.applicationArchiveUrl ||
+              build?.artifacts?.buildUrl ||
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.workflow_run.head_sha,
+              state: 'success',
+              context: 'EAS preview build (iOS)',
+              target_url: artifactUrl,
+              description: 'Preview build finished — Details links to the artifact.',
+            });
+
+      # Don't fail silently: on any failure above, paint the commit status red
+      # with a link to the logs. The job itself also ends as failed, so GitHub
+      # sends its standard failed-run notification to the actor.
+      - name: Report the failed build on the commit
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.workflow_run.head_sha,
+              state: 'failure',
+              context: 'EAS preview build (iOS)',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: 'Preview build failed — see the Actions log.',
+            });
