@@ -1,0 +1,54 @@
+# lychee link-checker configuration
+# Consumed by .github/workflows/link-check.yml. Kept in the repo root so lychee
+# auto-discovers it and so the settings are version-controlled and reviewable.
+#
+# The job's reason for existing: every question in the app cites an FAA handbook
+# page, and a rotted faa.gov URL silently breaks that traceability. These
+# settings are tuned to check those links reliably without crying wolf.
+
+#############################
+# Request behaviour
+#############################
+
+# faa.gov sits behind a CDN and is not always fast, so give each request room
+# and retry transient failures before declaring a link dead.
+timeout = 30          # seconds to wait for a response
+max_retries = 3       # attempts per link before it counts as broken
+retry_wait_time = 5   # seconds between retries
+
+# faa.gov PDFs can bounce through a couple of redirects before the file.
+max_redirects = 10
+
+# Present as a normal browser. faa.gov (and other CDN/WAF-fronted hosts) return
+# 403 to the default bot user-agent even though the page is fine, which is the
+# classic false positive this config exists to avoid.
+user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+# Treat any 2xx as alive. 429 (Too Many Requests) means the link exists but the
+# host is rate-limiting us, so accept it rather than fail a healthy URL.
+accept = ["200..=299", "429"]
+
+#############################
+# What to skip
+#############################
+
+# Reserved example domains (RFC 2606) used as placeholders in docs, seed scripts
+# and tests. They are intentionally non-functional and must never be flagged:
+#   - example.com     -> studio/README.md bundle-URL placeholder
+#   - example.invalid -> studio/scripts/seed-phak.ts bundle/manifest stubs
+exclude = [
+  "^https?://([a-z0-9.-]+\\.)?example\\.com(/|$)",
+  "^https?://([a-z0-9.-]+\\.)?example\\.invalid(/|$)",
+]
+
+# Never descend into dependency or build output, even if a future glob is
+# broadened. These are not present in the CI checkout today but guard against
+# surprises (e.g. someone running lychee locally after an install).
+exclude_path = [
+  "node_modules",
+  "studio/node_modules",
+  "dist",
+  "studio/dist",
+  "package-lock.json",
+  "studio/package-lock.json",
+]
