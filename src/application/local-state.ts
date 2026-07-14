@@ -7,6 +7,8 @@ const KEYS = {
   lessons: 'preflight.completed-lessons.v1',
   sections: 'preflight.completed-sections.v1',
   exam: 'preflight.module-exam.v1',
+  exams: 'preflight.completed-module-exams.v2',
+  activeModule: 'preflight.active-module.v2',
 } as const;
 
 export interface LocalLearningState {
@@ -14,23 +16,29 @@ export interface LocalLearningState {
   timeline: string;
   completedLessonIds: string[];
   completedSectionIds: string[];
-  moduleExamComplete: boolean;
+  completedModuleIds: string[];
+  activeModuleId: string;
 }
 
 export async function loadLocalLearningState(): Promise<LocalLearningState> {
-  const [onboarding, timeline, lessons, sections, exam] = await Promise.all([
+  const [onboarding, timeline, lessons, sections, exam, exams, activeModule] = await Promise.all([
     getItem(KEYS.onboarding),
     getItem(KEYS.timeline),
     getItem(KEYS.lessons),
     getItem(KEYS.sections),
     getItem(KEYS.exam),
+    getItem(KEYS.exams),
+    getItem(KEYS.activeModule),
   ]);
+  const completedModuleIds = new Set(parseStringArray(exams));
+  if (exam === 'true') completedModuleIds.add('phak');
   return {
     onboardingComplete: onboarding === 'true',
     timeline: timeline ?? '',
     completedLessonIds: parseStringArray(lessons),
     completedSectionIds: parseStringArray(sections),
-    moduleExamComplete: exam === 'true',
+    completedModuleIds: [...completedModuleIds],
+    activeModuleId: activeModule ?? 'phak',
   };
 }
 
@@ -46,8 +54,12 @@ export async function saveCompletedSections(ids: ReadonlySet<string>): Promise<v
   await setItem(KEYS.sections, JSON.stringify([...ids]));
 }
 
-export async function saveModuleExamComplete(): Promise<void> {
-  await setItem(KEYS.exam, 'true');
+export async function saveCompletedModules(ids: ReadonlySet<string>): Promise<void> {
+  await setItem(KEYS.exams, JSON.stringify([...ids]));
+}
+
+export async function saveActiveModuleId(moduleId: string): Promise<void> {
+  await setItem(KEYS.activeModule, moduleId);
 }
 
 async function getItem(key: string): Promise<string | null> {

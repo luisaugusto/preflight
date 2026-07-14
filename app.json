@@ -46,7 +46,7 @@
       "sanityProjectId": "4qoowg94",
       "sanityDataset": "production",
       "sanityApiVersion": "2026-07-12",
-      "contentManifestUrl": "https://cdn.sanity.io/files/4qoowg94/production/dddd69d5f8b6101a0029948feb654703ad42f5a3.json",
+      "contentManifestUrl": "https://cdn.sanity.io/files/4qoowg94/production/461e15f681d856857b874d077b67a76acdb53a84.json",
       "router": {
         "headers": {
           "Cross-Origin-Embedder-Policy": "credentialless",

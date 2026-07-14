@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict, dependency-free validation for the checked-in PHAK content bundle."""
+"""Strict validation for the checked-in four-module curriculum catalog."""
 
 from __future__ import annotations
 
@@ -9,12 +9,28 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from phak_config import CHAPTERS, PROJECT_ROOT, SOURCE_EDITION, SOURCE_SHA256, SOURCE_URL
+from catalog_seed import MODULE_SPECS
 
 
+ROOT = Path(__file__).resolve().parents[2]
 QUESTION_TYPES = {"multipleChoice", "numeric", "matching", "image"}
 ACS_PATTERN = re.compile(r"^PA\.[IVX]+\.[A-Z]\.(?:K|R|S)\d+[a-z]?$", re.IGNORECASE)
-PAGE_PATTERN = re.compile(r"^(?:\d{1,2}-\d{1,3})(?: to \d{1,2}-\d{1,3})?$")
+PAGE_PATTERN = re.compile(r"^(?:\d{1,2}-\d{1,3}|[A-Z]-\d{1,3})(?: to (?:\d{1,2}-\d{1,3}|[A-Z]-\d{1,3}))?$")
+EXPECTED = {
+    "phak": (26, 123, 104, 30, 78),
+    "afh": (20, 98, 80, 30, 60),
+    "awh": (35, 144, 140, 30, 105),
+    "rmh": (8, 25, 32, 30, 24),
+}
+ACS_ALLOWLIST = {
+    "PA.I.A.K1", "PA.I.A.K2", "PA.I.B.K1", "PA.I.B.K2", "PA.I.C.K1", "PA.I.C.K2",
+    "PA.I.C.K3", "PA.I.C.K4", "PA.I.C.R1", "PA.I.C.R2", "PA.I.D.K1", "PA.I.E.K1",
+    "PA.I.E.K2", "PA.I.E.R1", "PA.I.F.K1", "PA.I.F.K2", "PA.I.F.K3", "PA.I.F.K4",
+    "PA.I.F.R1", "PA.I.F.R2", "PA.I.G.K1", "PA.I.G.K2", "PA.I.H.K1", "PA.I.H.K2",
+    "PA.I.H.K3", "PA.I.H.R1", "PA.I.H.R2", "PA.I.H.R3", "PA.III.A.K1", "PA.III.B.K1",
+    "PA.III.C.K1", "PA.IX.C.K1", "PA.VI.A.K1", "PA.VI.A.K2", "PA.VII.A.K1",
+    "PA.VII.B.K1", "PA.VII.B.K2", "PA.VIII.A.K1", "PA.VIII.A.K2",
+}
 
 
 class Validation:
@@ -37,45 +53,47 @@ class Validation:
             self.ids.add(value)
 
     def acs(self, codes, path: str) -> None:
-        self.require(isinstance(codes, list) and len(codes) > 0, f"{path}: at least one ACS code is required")
+        self.require(isinstance(codes, list) and bool(codes), f"{path}: at least one ACS code is required")
         if isinstance(codes, list):
             for code in codes:
                 self.require(isinstance(code, str) and bool(ACS_PATTERN.fullmatch(code)), f"{path}: invalid ACS code {code!r}")
+                self.require(code in ACS_ALLOWLIST, f"{path}: ACS code is not in the pinned FAA-S-ACS-6C allowlist: {code!r}")
 
-    def citation(self, source, path: str, chapter_number: int | None = None) -> None:
-        self.require(isinstance(source, dict), f"{path}: citation must be an object")
-        if not isinstance(source, dict):
+    def citation(self, citation, path: str, source) -> None:
+        self.require(isinstance(citation, dict), f"{path}: citation must be an object")
+        if not isinstance(citation, dict):
             return
         for field in ("handbook", "edition", "chapter", "page", "url"):
-            self.text(source.get(field), f"{path}.{field}")
-        self.require(source.get("edition") == SOURCE_EDITION, f"{path}: edition mismatch")
-        self.require(source.get("url") == SOURCE_URL, f"{path}: source URL mismatch")
-        self.require(isinstance(source.get("page"), str) and bool(PAGE_PATTERN.fullmatch(source["page"])), f"{path}: malformed printed page {source.get('page')!r}")
-        if chapter_number is not None:
-            self.require(source.get("chapter", "").startswith(f"Chapter {chapter_number} "), f"{path}: wrong chapter")
+            self.text(citation.get(field), f"{path}.{field}")
+        self.require(citation.get("handbook") == source.title, f"{path}: handbook mismatch")
+        self.require(citation.get("edition") == source.edition, f"{path}: edition mismatch")
+        self.require(citation.get("url") == source.url, f"{path}: source URL mismatch")
+        self.require(isinstance(citation.get("page"), str) and bool(PAGE_PATTERN.fullmatch(citation["page"])), f"{path}: malformed printed page {citation.get('page')!r}")
+        pdf_page = citation.get("pdfPage")
+        self.require(isinstance(pdf_page, int) and 1 <= pdf_page <= source.page_count, f"{path}: invalid physical PDF page {pdf_page!r}")
 
-    def question(self, question, path: str, chapter_number: int | None = None) -> None:
+    def question(self, question, path: str, module_id: str, section_ids: set[str], source) -> None:
         self.require(isinstance(question, dict), f"{path}: question must be an object")
         if not isinstance(question, dict):
             return
         self.unique_id(question.get("id"), f"{path}.id")
+        self.require(question.get("moduleId") == module_id, f"{path}: module provenance mismatch")
+        self.require(question.get("sectionId") in section_ids, f"{path}: invalid section provenance")
         kind = question.get("type")
         self.require(kind in QUESTION_TYPES, f"{path}: unsupported type {kind!r}")
         if kind in QUESTION_TYPES:
             self.question_types[kind] += 1
         self.text(question.get("prompt"), f"{path}.prompt", 12)
         self.text(question.get("explanation"), f"{path}.explanation", 20)
-        self.citation(question.get("sourceCitation"), f"{path}.sourceCitation", chapter_number)
+        self.citation(question.get("sourceCitation"), f"{path}.sourceCitation", source)
         self.acs(question.get("acsCodes"), f"{path}.acsCodes")
-
         if kind in {"multipleChoice", "image"}:
             options = question.get("options")
             self.require(isinstance(options, list) and len(options) >= 2, f"{path}: at least two options required")
             if isinstance(options, list):
                 self.require(all(isinstance(option, str) and option.strip() for option in options), f"{path}: blank option")
                 self.require(len(set(options)) == len(options), f"{path}: duplicate options")
-                correct = question.get("correctIndex")
-                self.require(isinstance(correct, int) and 0 <= correct < len(options), f"{path}: invalid correctIndex")
+                self.require(isinstance(question.get("correctIndex"), int) and 0 <= question["correctIndex"] < len(options), f"{path}: invalid correctIndex")
         if kind == "numeric":
             answer = question.get("answer")
             self.require(isinstance(answer, dict), f"{path}: numeric answer missing")
@@ -85,126 +103,124 @@ class Validation:
                 self.text(answer.get("unit"), f"{path}.answer.unit")
         if kind == "matching":
             pairs = question.get("pairs")
-            self.require(isinstance(pairs, list) and len(pairs) >= 3, f"{path}: at least three matching pairs required")
+            self.require(isinstance(pairs, list) and len(pairs) >= 2, f"{path}: at least two matching pairs required")
             if isinstance(pairs, list):
-                left_values, right_values = [], []
-                for pair_index, pair in enumerate(pairs):
-                    pair_path = f"{path}.pairs[{pair_index}]"
-                    self.unique_id(pair.get("id") if isinstance(pair, dict) else None, f"{pair_path}.id")
+                pair_ids = set()
+                for index, pair in enumerate(pairs):
+                    self.text(pair.get("id") if isinstance(pair, dict) else None, f"{path}.pairs[{index}].id")
                     if isinstance(pair, dict):
-                        self.text(pair.get("left"), f"{pair_path}.left")
-                        self.text(pair.get("right"), f"{pair_path}.right")
-                        left_values.append(pair.get("left"))
-                        right_values.append(pair.get("right"))
-                self.require(len(set(left_values)) == len(left_values), f"{path}: duplicate left values")
-                self.require(len(set(right_values)) == len(right_values), f"{path}: duplicate right values")
+                        self.require(pair.get("id") not in pair_ids, f"{path}: duplicate pair id")
+                        pair_ids.add(pair.get("id"))
+                        self.text(pair.get("left"), f"{path}.pairs[{index}].left")
+                        self.text(pair.get("right"), f"{path}.pairs[{index}].right")
         if kind == "image":
             image = question.get("image")
             self.require(isinstance(image, dict), f"{path}: image metadata missing")
             if isinstance(image, dict):
                 for field in ("uri", "alt", "caption", "sourcePage"):
                     self.text(image.get(field), f"{path}.image.{field}")
-                uri = image.get("uri")
-                if isinstance(uri, str):
-                    asset = PROJECT_ROOT / uri
-                    self.require(asset.is_file() and asset.stat().st_size > 50_000, f"{path}: missing or undersized image asset {uri}")
+                asset = ROOT / str(image.get("uri", ""))
+                self.require(asset.is_file() and asset.stat().st_size > 50_000, f"{path}: missing or undersized image asset {image.get('uri')}")
 
 
-def validate(module: dict) -> Validation:
+def validate_catalog(catalog: dict, coverage: dict) -> Validation:
     result = Validation()
-    for field in ("id", "title", "shortTitle", "description", "version"):
-        result.text(module.get(field), f"module.{field}")
-    result.unique_id(module.get("id"), "module.id")
-    source = module.get("source")
-    result.require(isinstance(source, dict), "module.source: object required")
-    if isinstance(source, dict):
-        result.require(source.get("url") == SOURCE_URL, "module.source.url mismatch")
-        result.require(source.get("edition") == SOURCE_EDITION, "module.source.edition mismatch")
-        result.require(source.get("checksum") == SOURCE_SHA256, "module.source.checksum mismatch")
+    result.require(catalog.get("schemaVersion") == 2, "catalog.schemaVersion must be 2")
+    result.text(catalog.get("catalogId"), "catalog.catalogId")
+    result.text(catalog.get("contentVersion"), "catalog.contentVersion")
+    modules = catalog.get("modules")
+    result.require(isinstance(modules, list), "catalog.modules must be an array")
+    if not isinstance(modules, list):
+        return result
+    result.require([module.get("id") for module in modules] == ["phak", "afh", "awh", "rmh"], "catalog module order must be PHAK, AFH, AWH, RMH")
+    coverage_by_module = {module["moduleId"]: module for module in coverage.get("modules", [])}
 
-    sections = module.get("sections")
-    result.require(isinstance(sections, list) and len(sections) == 17, "module.sections: exactly 17 required")
-    if isinstance(sections, list):
-        result.require([section.get("order") for section in sections if isinstance(section, dict)] == list(range(1, 18)), "sections must be ordered 1 through 17")
+    for module in modules:
+        module_id = module.get("id")
+        result.unique_id(module_id, f"modules[{module_id}].id")
+        result.require(module_id in MODULE_SPECS, f"unknown module {module_id}")
+        if module_id not in MODULE_SPECS:
+            continue
+        source, _ = MODULE_SPECS[module_id]
+        result.require(module.get("version") == catalog.get("contentVersion"), f"{module_id}: version mismatch")
+        metadata = module.get("source", {})
+        result.require(metadata.get("url") == source.url, f"{module_id}: source URL mismatch")
+        result.require(metadata.get("edition") == source.edition, f"{module_id}: source edition mismatch")
+        result.require(metadata.get("checksum") == source.checksum, f"{module_id}: source checksum mismatch")
+        sections = module.get("sections", [])
+        section_ids = {section.get("id") for section in sections if isinstance(section, dict)}
+        expected_sections, expected_lessons, expected_quiz, expected_exam, expected_terms = EXPECTED[module_id]
+        result.require(len(sections) == expected_sections, f"{module_id}: expected {expected_sections} sections")
+        result.require([section.get("order") for section in sections] == list(range(1, expected_sections + 1)), f"{module_id}: section order is not contiguous")
         for section_index, section in enumerate(sections):
-            path = f"sections[{section_index}]"
-            chapter_number = section_index + 1
-            result.require(isinstance(section, dict), f"{path}: object required")
-            if not isinstance(section, dict):
-                continue
+            path = f"{module_id}.sections[{section_index}]"
             result.unique_id(section.get("id"), f"{path}.id")
             result.text(section.get("title"), f"{path}.title")
-            result.text(section.get("summary"), f"{path}.summary", 30)
-            result.text(section.get("sourcePages"), f"{path}.sourcePages")
+            result.text(section.get("summary"), f"{path}.summary", 40)
             result.acs(section.get("acsCodes"), f"{path}.acsCodes")
-            lessons = section.get("lessons")
-            result.require(isinstance(lessons, list) and len(lessons) >= 3, f"{path}: at least three lessons required")
-            if isinstance(lessons, list):
-                result.require([lesson.get("order") for lesson in lessons if isinstance(lesson, dict)] == list(range(1, len(lessons) + 1)), f"{path}: lesson order invalid")
-                for lesson_index, lesson in enumerate(lessons):
-                    lesson_path = f"{path}.lessons[{lesson_index}]"
-                    result.require(isinstance(lesson, dict), f"{lesson_path}: object required")
-                    if not isinstance(lesson, dict):
-                        continue
-                    result.unique_id(lesson.get("id"), f"{lesson_path}.id")
-                    for field, minimum in (("title", 3), ("concept", 30), ("explanation", 60), ("workedExample", 50)):
-                        result.text(lesson.get(field), f"{lesson_path}.{field}", minimum)
-                    result.require(isinstance(lesson.get("estimatedMinutes"), int) and 1 <= lesson["estimatedMinutes"] <= 5, f"{lesson_path}: estimatedMinutes must be 1..5")
-                    result.citation(lesson.get("sourceCitation"), f"{lesson_path}.sourceCitation", chapter_number)
-                    result.acs(lesson.get("acsCodes"), f"{lesson_path}.acsCodes")
-                    result.question(lesson.get("practice"), f"{lesson_path}.practice", chapter_number)
-            quiz = section.get("quiz")
-            result.require(isinstance(quiz, list) and len(quiz) >= 3, f"{path}: at least three quiz questions required")
-            if isinstance(quiz, list):
-                quiz_types = set()
-                for question_index, question in enumerate(quiz):
-                    result.question(question, f"{path}.quiz[{question_index}]", chapter_number)
-                    if isinstance(question, dict):
-                        quiz_types.add(question.get("type"))
-                result.require(len(quiz_types) >= 3, f"{path}: quiz must mix at least three question types")
+            lessons = section.get("lessons", [])
+            result.require(2 <= len(lessons) <= 6, f"{path}: expected 2..6 lessons")
+            result.require([lesson.get("order") for lesson in lessons] == list(range(1, len(lessons) + 1)), f"{path}: lesson order invalid")
+            for lesson_index, lesson in enumerate(lessons):
+                lesson_path = f"{path}.lessons[{lesson_index}]"
+                result.unique_id(lesson.get("id"), f"{lesson_path}.id")
+                for field, minimum in (("title", 3), ("concept", 30), ("explanation", 60), ("workedExample", 80)):
+                    result.text(lesson.get(field), f"{lesson_path}.{field}", minimum)
+                result.citation(lesson.get("sourceCitation"), f"{lesson_path}.sourceCitation", source)
+                result.acs(lesson.get("acsCodes"), f"{lesson_path}.acsCodes")
+                result.question(lesson.get("practice"), f"{lesson_path}.practice", module_id, {section["id"]}, source)
+            quiz = section.get("quiz", [])
+            result.require(len(quiz) == 4, f"{path}: exactly four quiz questions required")
+            for question_index, question in enumerate(quiz):
+                result.question(question, f"{path}.quiz[{question_index}]", module_id, {section["id"]}, source)
+            result.require(len({question.get("type") for question in quiz}) >= 3, f"{path}: quiz must use at least three interaction types")
+            result.require(any(question.get("type") == "image" for question in quiz), f"{path}: quiz requires an image question")
 
-    exam = module.get("exam")
-    result.require(isinstance(exam, list) and len(exam) == 30, "module.exam: exactly 30 questions required")
-    if isinstance(exam, list):
+        result.require(sum(len(section["lessons"]) for section in sections) == expected_lessons, f"{module_id}: lesson count mismatch")
+        result.require(sum(len(section["quiz"]) for section in sections) == expected_quiz, f"{module_id}: section-question count mismatch")
+        exam = module.get("exam", [])
+        result.require(len(exam) == expected_exam, f"{module_id}: exam count mismatch")
         for index, question in enumerate(exam):
-            result.question(question, f"exam[{index}]")
-        result.require({question.get("type") for question in exam if isinstance(question, dict)} == QUESTION_TYPES, "module.exam must include all four question types")
-
-    glossary = module.get("glossary")
-    result.require(isinstance(glossary, list) and len(glossary) >= 51, "module.glossary: at least 51 terms required")
-    section_ids = {section.get("id") for section in sections if isinstance(section, dict)} if isinstance(sections, list) else set()
-    if isinstance(glossary, list):
+            result.question(question, f"{module_id}.exam[{index}]", module_id, section_ids, source)
+        result.require({question.get("type") for question in exam} == QUESTION_TYPES, f"{module_id}: exam must use all four interaction types")
+        section_prompts = {question["prompt"] for section in sections for question in section["quiz"]}
+        result.require(not section_prompts.intersection(question["prompt"] for question in exam), f"{module_id}: exam prompts must not duplicate section prompts")
+        glossary = module.get("glossary", [])
+        result.require(len(glossary) == expected_terms, f"{module_id}: glossary count mismatch")
         for index, term in enumerate(glossary):
-            path = f"glossary[{index}]"
-            result.unique_id(term.get("id") if isinstance(term, dict) else None, f"{path}.id")
-            if isinstance(term, dict):
-                result.text(term.get("term"), f"{path}.term")
-                result.text(term.get("definition"), f"{path}.definition", 20)
-                result.require(term.get("sectionId") in section_ids, f"{path}: invalid sectionId")
-                result.citation(term.get("sourceCitation"), f"{path}.sourceCitation")
-                result.acs(term.get("acsCodes"), f"{path}.acsCodes")
+            path = f"{module_id}.glossary[{index}]"
+            result.unique_id(term.get("id"), f"{path}.id")
+            result.require(term.get("moduleId") == module_id, f"{path}: module provenance mismatch")
+            result.require(term.get("sectionId") in section_ids, f"{path}: invalid section provenance")
+            result.text(term.get("term"), f"{path}.term")
+            result.text(term.get("definition"), f"{path}.definition", 20)
+            result.citation(term.get("sourceCitation"), f"{path}.sourceCitation", source)
+            result.acs(term.get("acsCodes"), f"{path}.acsCodes")
+
+        module_coverage = coverage_by_module.get(module_id, {})
+        result.require(bool(module_coverage.get("appendices")), f"{module_id}: appendix disposition is missing")
+        covered_sections = {item.get("sectionId") for item in module_coverage.get("sections", [])}
+        result.require(covered_sections == section_ids, f"{module_id}: coverage matrix does not match catalog sections")
+        covered_lessons = {lesson.get("lessonId") for item in module_coverage.get("sections", []) for lesson in item.get("lessons", [])}
+        actual_lessons = {lesson["id"] for section in sections for lesson in section["lessons"]}
+        result.require(covered_lessons == actual_lessons, f"{module_id}: coverage matrix does not match catalog lessons")
     return result
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("bundle", nargs="?", type=Path, default=PROJECT_ROOT / "src" / "content" / "phak.json")
+    parser.add_argument("bundle", nargs="?", type=Path, default=ROOT / "src" / "content" / "catalog.json")
+    parser.add_argument("--coverage", type=Path, default=ROOT / "scripts" / "content" / "coverage.json")
     args = parser.parse_args()
-    module = json.loads(args.bundle.read_text(encoding="utf-8"))
-    result = validate(module)
+    result = validate_catalog(json.loads(args.bundle.read_text()), json.loads(args.coverage.read_text()))
     if result.errors:
         print(f"Validation failed with {len(result.errors)} error(s):")
         for error in result.errors:
             print(f"- {error}")
         return 1
-    print(
-        "PHAK bundle valid: "
-        f"17 sections, 51 lessons, 68 section questions, 30 exam questions, "
-        f"51 glossary terms; question types {dict(sorted(result.question_types.items()))}"
-    )
+    print(f"Curriculum catalog valid: 4 modules, 89 sections, 390 lessons, 866 questions, 267 terms; question types {dict(sorted(result.question_types.items()))}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

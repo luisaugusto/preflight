@@ -9,11 +9,16 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Constants from 'expo-constants';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
-import phakContent from '@/content/phak.json';
-import type { ModuleContent, Question, Section } from '@/lib/content/types';
+import catalogContent from '@/content/catalog.json';
+import type { CurriculumBundle, Question, Section } from '@/lib/content/types';
 import { createPreflightRepository, type PreflightRepository, type ResumePosition } from '@/lib/db';
 import { answerOutcomeToRating, createReviewCard, scheduleReview } from '@/lib/fsrs';
-import { ExpoFileContentStore, MemoryContentStore, syncContent } from '@/lib/content-sync';
+import {
+  ExpoFileContentStore,
+  MemoryContentStore,
+  overlayCurriculum,
+  syncContent,
+} from '@/lib/content-sync';
 import {
   buildCalculationQuestions,
   buildVocabularyQuestions,
@@ -26,11 +31,13 @@ import { LessonScreen } from '@/screens/lesson-screen';
 import { QuizScreen } from '@/screens/quiz-screen';
 import { PracticeScreen } from '@/screens/practice-screen';
 import { InfoScreen } from '@/screens/info-screen';
+import { ModulesScreen } from '@/screens/modules-screen';
 import {
   loadLocalLearningState,
   saveCompletedLessons,
   saveCompletedSections,
-  saveModuleExamComplete,
+  saveActiveModuleId,
+  saveCompletedModules,
   saveOnboarding,
 } from '@/application/local-state';
 import { analytics } from '@/application/analytics';
@@ -44,9 +51,29 @@ type AppRoute =
   | 'daily'
   | 'vocabulary'
   | 'calculations'
-  | 'info';
+  | 'info'
+  | 'modules';
 
-const bundledModule = phakContent as ModuleContent;
+const bundledCurriculum = catalogContent as CurriculumBundle;
+const firstBundledModule = bundledCurriculum.modules[0];
+
+function reconcileCompletedSections(
+  curriculum: CurriculumBundle,
+  completedLessonIds: ReadonlySet<string>,
+  recordedSectionIds: ReadonlySet<string>,
+): Set<string> {
+  return new Set(
+    curriculum.modules.flatMap((module) =>
+      module.sections
+        .filter(
+          (section) =>
+            recordedSectionIds.has(section.id) &&
+            section.lessons.every((lesson) => completedLessonIds.has(lesson.id)),
+        )
+        .map((section) => section.id),
+    ),
+  );
+}
 
 export function PreflightApp() {
   const [fontsLoaded] = useFonts({
@@ -58,10 +85,12 @@ export function PreflightApp() {
   const [hydrated, setHydrated] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [route, setRoute] = useState<AppRoute>('home');
-  const [moduleContent, setModuleContent] = useState<ModuleContent>(bundledModule);
+  const [curriculum, setCurriculum] = useState<CurriculumBundle>(bundledCurriculum);
+  const [activeModuleId, setActiveModuleId] = useState(firstBundledModule.id);
   const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set());
   const [completedSectionIds, setCompletedSectionIds] = useState<Set<string>>(new Set());
-  const [activeSectionId, setActiveSectionId] = useState(bundledModule.sections[0]?.id ?? '');
+  const [completedModuleIds, setCompletedModuleIds] = useState<Set<string>>(new Set());
+  const [activeSectionId, setActiveSectionId] = useState(firstBundledModule.sections[0]?.id ?? '');
   const [lessonIndex, setLessonIndex] = useState(0);
   const [lessonStage, setLessonStage] = useState(0);
   const [resumePosition, setResumePosition] = useState<ResumePosition | null>(null);
@@ -69,6 +98,16 @@ export function PreflightApp() {
   const [dailySessionQuestions, setDailySessionQuestions] = useState<Question[]>([]);
   const [vocabularyOffset, setVocabularyOffset] = useState(0);
   const repository = useRef<PreflightRepository | null>(null);
+  const moduleSelectionRequest = useRef(0);
+  const moduleContent = useMemo(
+    () =>
+      curriculum.modules.find((module) => module.id === activeModuleId) ?? curriculum.modules[0],
+    [activeModuleId, curriculum],
+  );
+  const verifiedCompletedSectionIds = useMemo(
+    () => reconcileCompletedSections(curriculum, completedLessonIds, completedSectionIds),
+    [completedLessonIds, completedSectionIds, curriculum],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -83,17 +122,31 @@ export function PreflightApp() {
         const databaseSections = databaseCompletions
           .filter((item) => item.contentType === 'section')
           .map((item) => item.contentId);
+        const databaseModules = databaseCompletions
+          .filter((item) => item.contentType === 'module')
+          .map((item) => item.contentId);
+        const lessons = new Set([...state.completedLessonIds, ...databaseLessons]);
+        const recordedSections = new Set([...state.completedSectionIds, ...databaseSections]);
+        const requestedModule = bundledCurriculum.modules.find(
+          (module) => module.id === state.activeModuleId,
+        );
+        const selectedModule = requestedModule ?? firstBundledModule;
         setOnboardingComplete(state.onboardingComplete);
-        setCompletedLessonIds(new Set([...state.completedLessonIds, ...databaseLessons]));
-        setCompletedSectionIds(new Set([...state.completedSectionIds, ...databaseSections]));
+        setCompletedLessonIds(lessons);
+        setCompletedSectionIds(
+          reconcileCompletedSections(bundledCurriculum, lessons, recordedSections),
+        );
+        setCompletedModuleIds(new Set([...state.completedModuleIds, ...databaseModules]));
+        setActiveModuleId(selectedModule.id);
+        setActiveSectionId(selectedModule.sections[0]?.id ?? '');
         if (repo) {
-          const resume = await repo.getResumePosition(bundledModule.id);
+          const resume = await repo.getResumePosition(selectedModule.id);
           if (
-            resume?.contentVersion === bundledModule.version &&
+            resume?.contentVersion === selectedModule.version &&
             resume.sectionId &&
             resume.lessonId
           ) {
-            const section = bundledModule.sections.find((item) => item.id === resume.sectionId);
+            const section = selectedModule.sections.find((item) => item.id === resume.sectionId);
             const resumedLessonIndex =
               section?.lessons.findIndex((item) => item.id === resume.lessonId) ?? -1;
             if (section && resumedLessonIndex >= 0) {
@@ -103,7 +156,7 @@ export function PreflightApp() {
               setResumePosition(resume);
             }
           }
-          const due = await repo.listDueReviewCards(new Date(), 20);
+          const due = await repo.listDueReviewCards(new Date(), 1000);
           setDueQuestionIds(
             due.filter((card) => card.contentType === 'question').map((card) => card.contentId),
           );
@@ -127,11 +180,21 @@ export function PreflightApp() {
     void (async () => {
       try {
         const cached = await store.readActive().catch(() => null);
-        if (mounted && cached?.module) setModuleContent(cached.module);
+        if (mounted && cached?.catalog) {
+          setCurriculum(
+            cached.manifest.schemaVersion >= 2
+              ? cached.catalog
+              : overlayCurriculum(bundledCurriculum, cached.catalog),
+          );
+        }
         if (!manifestUrl) return;
         const result = await syncContent(manifestUrl, { store });
-        if (mounted && result.active?.module) {
-          setModuleContent(result.active.module);
+        if (mounted && result.active?.catalog) {
+          setCurriculum(
+            result.active.manifest.schemaVersion >= 2
+              ? result.active.catalog
+              : overlayCurriculum(bundledCurriculum, result.active.catalog),
+          );
           await repository.current?.saveContentState({
             version: result.active.manifest.contentVersion,
             checksum: result.active.manifest.checksum,
@@ -154,12 +217,39 @@ export function PreflightApp() {
     [activeSectionId, moduleContent],
   );
 
+  const selectModule = (moduleId: string) => {
+    const nextModule = curriculum.modules.find((module) => module.id === moduleId);
+    if (!nextModule) return;
+    const request = moduleSelectionRequest.current + 1;
+    moduleSelectionRequest.current = request;
+    setActiveModuleId(nextModule.id);
+    setActiveSectionId(nextModule.sections[0]?.id ?? '');
+    setLessonIndex(0);
+    setResumePosition(null);
+    setRoute('home');
+    void saveActiveModuleId(nextModule.id);
+    void (async () => {
+      const resume = await repository.current?.getResumePosition(nextModule.id);
+      if (resume?.contentVersion !== nextModule.version || !resume.sectionId || !resume.lessonId) {
+        return;
+      }
+      const section = nextModule.sections.find((item) => item.id === resume.sectionId);
+      const resumedLessonIndex =
+        section?.lessons.findIndex((item) => item.id === resume.lessonId) ?? -1;
+      if (!section || resumedLessonIndex < 0 || moduleSelectionRequest.current !== request) return;
+      setActiveSectionId(section.id);
+      setLessonIndex(resumedLessonIndex);
+      setLessonStage(Math.min(3, Math.max(0, resume.blockIndex)));
+      setResumePosition(resume);
+    })().catch(() => undefined);
+  };
+
   const openSection = (section: Section) => {
     const firstIncomplete = section.lessons.findIndex(
       (lesson) => !completedLessonIds.has(lesson.id),
     );
     setActiveSectionId(section.id);
-    if (firstIncomplete < 0 && !completedSectionIds.has(section.id)) {
+    if (firstIncomplete < 0 && !verifiedCompletedSectionIds.has(section.id)) {
       setResumePosition(null);
       void repository.current?.clearResumePosition(moduleContent.id);
       setRoute('sectionQuiz');
@@ -224,28 +314,42 @@ export function PreflightApp() {
   };
 
   const vocabularyQuestions = useMemo(
-    () => buildVocabularyQuestions(moduleContent),
-    [moduleContent],
+    () => buildVocabularyQuestions(curriculum.modules, verifiedCompletedSectionIds),
+    [curriculum.modules, verifiedCompletedSectionIds],
   );
   const vocabularyDrillQuestions = useMemo(
     () => selectQuestionWindow(vocabularyQuestions, vocabularyOffset, 10),
     [vocabularyOffset, vocabularyQuestions],
   );
   const calculationQuestions = useMemo(
-    () => buildCalculationQuestions(moduleContent),
-    [moduleContent],
+    () => buildCalculationQuestions(curriculum.modules, verifiedCompletedSectionIds),
+    [curriculum.modules, verifiedCompletedSectionIds],
+  );
+
+  const eligibleSections = useMemo(
+    () =>
+      curriculum.modules.flatMap((module) =>
+        module.sections
+          .filter((section) => verifiedCompletedSectionIds.has(section.id))
+          .map((section) => ({ module, section })),
+      ),
+    [curriculum.modules, verifiedCompletedSectionIds],
   );
 
   const reviewableQuestions = useMemo(
     () => [
-      ...moduleContent.sections.flatMap((section) => [
+      ...eligibleSections.flatMap(({ section }) => [
         ...section.lessons.map((lesson) => lesson.practice),
         ...section.quiz,
       ]),
-      ...moduleContent.exam,
+      ...curriculum.modules.flatMap((module) =>
+        module.exam.filter(
+          (question) => question.sectionId && verifiedCompletedSectionIds.has(question.sectionId),
+        ),
+      ),
       ...vocabularyQuestions,
     ],
-    [moduleContent, vocabularyQuestions],
+    [curriculum.modules, eligibleSections, verifiedCompletedSectionIds, vocabularyQuestions],
   );
 
   const dueQuestions = useMemo(() => {
@@ -257,15 +361,13 @@ export function PreflightApp() {
 
   const dailyQuestions = useMemo(() => {
     if (dueQuestions.length) return dueQuestions.slice(0, 8);
-    const learned = moduleContent.sections
-      .flatMap((section) => section.lessons)
-      .filter((lesson) => completedLessonIds.has(lesson.id))
-      .map((lesson) => lesson.practice);
-    const fallback = moduleContent.sections.flatMap((section) =>
-      section.lessons.map((lesson) => lesson.practice),
-    );
-    return (learned.length ? learned : fallback).slice(0, 8);
-  }, [completedLessonIds, dueQuestions, moduleContent]);
+    return eligibleSections
+      .flatMap(({ section }) => [
+        ...section.lessons.map((lesson) => lesson.practice),
+        ...section.quiz,
+      ])
+      .slice(0, 8);
+  }, [dueQuestions, eligibleSections]);
 
   const recordQuestionResult = (
     question: Question,
@@ -279,19 +381,21 @@ export function PreflightApp() {
     void (async () => {
       await repo.recordAttempt({
         questionId: question.id,
-        sectionId: sectionId ?? null,
-        moduleId: moduleContent.id,
+        sectionId: question.sectionId ?? sectionId ?? null,
+        moduleId: question.moduleId ?? moduleContent.id,
         isCorrect: correct,
         score: correct ? 1 : 0,
         maxScore: 1,
-        contentVersion: moduleContent.version,
+        contentVersion:
+          curriculum.modules.find((module) => module.id === question.moduleId)?.version ??
+          moduleContent.version,
       });
       if (!scheduleForReview) return;
       const existing = await repo.getReviewCard(question.id, 'question');
       const current = existing ?? createReviewCard(question.id, 'question');
       const review = scheduleReview(current, answerOutcomeToRating(correct));
       await repo.saveReview(review.card, review.log);
-      const due = await repo.listDueReviewCards(new Date(), 20);
+      const due = await repo.listDueReviewCards(new Date(), 1000);
       setDueQuestionIds(
         due.filter((card) => card.contentType === 'question').map((card) => card.contentId),
       );
@@ -313,16 +417,32 @@ export function PreflightApp() {
     );
   }
 
+  if (route === 'modules') {
+    return (
+      <ModulesScreen
+        modules={curriculum.modules}
+        activeModuleId={moduleContent.id}
+        completedLessonIds={completedLessonIds}
+        completedSectionIds={verifiedCompletedSectionIds}
+        completedModuleIds={completedModuleIds}
+        onSelect={selectModule}
+        onBack={() => setRoute('home')}
+      />
+    );
+  }
+
   if (route === 'home') {
     return (
       <HomeScreen
         module={moduleContent}
         completedLessonIds={completedLessonIds}
-        completedSectionIds={completedSectionIds}
+        completedSectionIds={verifiedCompletedSectionIds}
         onOpenSection={openSection}
         onPractice={() => setRoute('practice')}
         onInfo={() => setRoute('info')}
         onExam={() => setRoute('exam')}
+        onModules={() => setRoute('modules')}
+        moduleNumber={curriculum.modules.findIndex((module) => module.id === moduleContent.id) + 1}
       />
     );
   }
@@ -372,7 +492,7 @@ export function PreflightApp() {
         onFinish={({ passed }) => {
           analytics.track('quiz_completed', { sectionId: activeSection.id, passed });
           if (passed) {
-            const next = new Set(completedSectionIds);
+            const next = new Set(verifiedCompletedSectionIds);
             next.add(activeSection.id);
             setCompletedSectionIds(next);
             void saveCompletedSections(next);
@@ -381,7 +501,7 @@ export function PreflightApp() {
               contentType: 'section',
               contentVersion: moduleContent.version,
             });
-            if (!completedSectionIds.has(activeSection.id)) {
+            if (!verifiedCompletedSectionIds.has(activeSection.id)) {
               analytics.track('section_completed', { sectionId: activeSection.id });
               if (moduleContent.sections.every((section) => next.has(section.id))) {
                 analytics.track('module_exam_unlocked', { moduleId: moduleContent.id });
@@ -400,15 +520,20 @@ export function PreflightApp() {
   if (route === 'exam') {
     return (
       <QuizScreen
-        title="PHAK module exam"
-        label="FINAL CHECK / MODULE 01"
+        title={`${moduleContent.shortTitle} module exam`}
+        label={`FINAL CHECK / MODULE ${String(
+          curriculum.modules.findIndex((module) => module.id === moduleContent.id) + 1,
+        ).padStart(2, '0')}`}
         questions={moduleContent.exam}
         passThreshold={0.8}
         onExit={() => setRoute('home')}
         onFinish={({ passed }) => {
           analytics.track('module_exam_completed', { passed });
           if (passed) {
-            void saveModuleExamComplete();
+            const next = new Set(completedModuleIds);
+            next.add(moduleContent.id);
+            setCompletedModuleIds(next);
+            void saveCompletedModules(next);
             void repository.current?.saveCompletion({
               contentId: moduleContent.id,
               contentType: 'module',
@@ -426,6 +551,9 @@ export function PreflightApp() {
     return (
       <PracticeScreen
         dueCount={Math.min(dueQuestions.length, 8)}
+        eligibleSectionCount={eligibleSections.length}
+        vocabularyCount={vocabularyQuestions.length}
+        calculationCount={calculationQuestions.length}
         onOpen={(nextRoute) => {
           if (nextRoute === 'daily') setDailySessionQuestions(dailyQuestions);
           setRoute(nextRoute);
