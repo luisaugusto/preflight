@@ -55,6 +55,8 @@ As a defense-in-depth complement to the CI gate, enable GitHub's native **secret
 
 The reproducible handbook pipeline is documented in [scripts/content/README.md](./scripts/content/README.md). It pins the official FAA PDF checksum, extracts chapter text and representative figures, builds `src/content/phak.json`, and rejects invalid citations, ACS tags, answer keys, numeric specifications, or image references.
 
+A weekly [link check](./.github/workflows/link-check.yml) (via [lychee](https://github.com/lycheeverse/lychee)) validates the FAA source URLs configured in this pipeline alongside every Markdown link, so a rotted citation can't silently break traceability. It fails any pull request that touches docs and, on the scheduled run, opens a self-closing tracking issue instead of blocking unrelated work. Known-flaky and placeholder hosts are allowlisted in [lychee.toml](./lychee.toml).
+
 Current bundle:
 
 - 17 sections
