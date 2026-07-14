@@ -7,6 +7,7 @@ import {
   Eyebrow,
   Header,
   Pill,
+  IconButton,
   PrimaryButton,
   Screen,
   SegmentedProgress,
@@ -21,6 +22,10 @@ export function LessonScreen({
   initialStage = 0,
   onExit,
   onStageChange,
+  onNavigateLesson,
+  isLessonComplete = false,
+  canNavigateToPreviousLesson = false,
+  canNavigateToNextLesson = false,
   onComplete,
 }: {
   section: Section;
@@ -29,14 +34,39 @@ export function LessonScreen({
   initialStage?: number;
   onExit: () => void;
   onStageChange?: (stage: number) => void;
+  onNavigateLesson?: (direction: 'previous' | 'next') => void;
+  isLessonComplete?: boolean;
+  canNavigateToPreviousLesson?: boolean;
+  canNavigateToNextLesson?: boolean;
   onComplete: (correct: boolean) => void;
 }) {
   const [stage, setStage] = useState(initialStage);
+  const [maxStageReached, setMaxStageReached] = useState(initialStage);
   const [practiceCorrect, setPracticeCorrect] = useState(false);
   const totalStages = 4;
   const moveToStage = (nextStage: number) => {
-    setStage(nextStage);
-    onStageChange?.(nextStage);
+    const clampedStage = Math.min(totalStages - 1, Math.max(0, nextStage));
+    setStage(clampedStage);
+    setMaxStageReached((current) => Math.max(current, clampedStage));
+    onStageChange?.(clampedStage);
+  };
+  const canGoBack = stage > 0 || canNavigateToPreviousLesson;
+  const canGoForward =
+    stage < Math.max(maxStageReached, initialStage) ||
+    (stage === totalStages - 1 && isLessonComplete && canNavigateToNextLesson);
+  const navigateBack = () => {
+    if (stage > 0) {
+      moveToStage(stage - 1);
+      return;
+    }
+    onNavigateLesson?.('previous');
+  };
+  const navigateForward = () => {
+    if (stage < Math.max(maxStageReached, initialStage)) {
+      moveToStage(stage + 1);
+      return;
+    }
+    if (stage === totalStages - 1 && isLessonComplete) onNavigateLesson?.('next');
   };
 
   return (
@@ -47,6 +77,23 @@ export function LessonScreen({
         trailing={<Pill tone="blue">~{lesson.estimatedMinutes} MIN</Pill>}
       />
       <SegmentedProgress current={stage + 1} total={totalStages} />
+      <View style={styles.navigationRow}>
+        <IconButton
+          name="chevron-left"
+          accessibilityLabel="Previous lesson screen"
+          onPress={navigateBack}
+          disabled={!canGoBack}
+        />
+        <Text style={styles.navigationText}>
+          Screen {stage + 1} of {totalStages}
+        </Text>
+        <IconButton
+          name="chevron-right"
+          accessibilityLabel="Next lesson screen"
+          onPress={navigateForward}
+          disabled={!canGoForward}
+        />
+      </View>
 
       <View style={styles.lessonHead}>
         <Eyebrow>
@@ -143,7 +190,14 @@ export function LessonScreen({
 
 const styles = StyleSheet.create({
   content: { paddingBottom: 34 },
-  lessonHead: { marginTop: 26, marginBottom: 22, gap: 8 },
+  navigationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+  },
+  navigationText: { ...type.eyebrow, color: colors.muted },
+  lessonHead: { marginTop: 20, marginBottom: 22, gap: 8 },
   lessonTitle: { ...type.title, fontSize: 34 },
   stageWrap: { gap: 18 },
   conceptCard: { gap: 16, padding: 20, borderWidth: 1.5 },

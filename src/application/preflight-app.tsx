@@ -313,6 +313,25 @@ export function PreflightApp() {
     }
   };
 
+  const navigateLessonScreen = (direction: 'previous' | 'next') => {
+    const nextIndex = direction === 'previous' ? lessonIndex - 1 : lessonIndex + 1;
+    const targetLesson = activeSection.lessons[nextIndex];
+    if (!targetLesson) return;
+    const targetStage = completedLessonIds.has(targetLesson.id) ? 3 : 0;
+    setLessonIndex(nextIndex);
+    setLessonStage(targetStage);
+    const nextResume: ResumePosition = {
+      moduleId: moduleContent.id,
+      sectionId: activeSection.id,
+      lessonId: targetLesson.id,
+      blockIndex: targetStage,
+      contentVersion: moduleContent.version,
+      updatedAt: new Date().toISOString(),
+    };
+    setResumePosition(nextResume);
+    void repository.current?.saveResumePosition(nextResume);
+  };
+
   const vocabularyQuestions = useMemo(
     () => buildVocabularyQuestions(curriculum.modules, verifiedCompletedSectionIds),
     [curriculum.modules, verifiedCompletedSectionIds],
@@ -455,6 +474,13 @@ export function PreflightApp() {
         lesson={activeSection.lessons[lessonIndex]}
         lessonIndex={lessonIndex}
         initialStage={lessonStage}
+        isLessonComplete={completedLessonIds.has(activeSection.lessons[lessonIndex].id)}
+        canNavigateToPreviousLesson={lessonIndex > 0}
+        canNavigateToNextLesson={
+          lessonIndex < activeSection.lessons.length - 1 &&
+          completedLessonIds.has(activeSection.lessons[lessonIndex + 1].id)
+        }
+        onNavigateLesson={navigateLessonScreen}
         onExit={() => setRoute('home')}
         onStageChange={(stage) => {
           const lesson = activeSection.lessons[lessonIndex];
