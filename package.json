@@ -61,7 +61,9 @@
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "content:validate": "node scripts/content/validate-content.mjs",
-    "content:extract": "python3 scripts/content/extract_phak.py",
+    "content:download": "python3 scripts/content/download_handbooks.py",
+    "content:build": "python3 scripts/content/build_catalog.py && python3 scripts/content/render_figures.py && python3 scripts/content/generate_figure_assets.py && prettier --write src/content/catalog.json scripts/content/coverage.json src/content/figure-assets.ts",
+    "content:extract": "npm run content:download && npm run content:build",
     "secrets:check": "bash scripts/ci/check-expo-public-secrets.sh",
     "studio": "npm --prefix studio run dev",
     "studio:deploy-schema": "npm --prefix studio run schema:deploy"

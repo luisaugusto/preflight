@@ -2,7 +2,13 @@ import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import { Directory, File, Paths } from 'expo-file-system';
 import { z } from 'zod';
 
-import type { ContentBundle, ModuleContent, Question, SourceCitation } from './content/types';
+import type {
+  ContentBundle,
+  CurriculumBundle,
+  ModuleContent,
+  Question,
+  SourceCitation,
+} from './content/types';
 
 const nonEmptyString = z.string().trim().min(1);
 const contentIdSchema = nonEmptyString.max(200);
@@ -14,6 +20,8 @@ export const sourceCitationSchema: z.ZodType<SourceCitation> = z
     edition: nonEmptyString,
     chapter: nonEmptyString,
     page: z.union([nonEmptyString, z.number().finite()]),
+    pdfPage: z.number().int().positive().optional(),
+    pdfPageEnd: z.number().int().positive().optional(),
     url: z.string().url(),
     figure: nonEmptyString.optional(),
   })
@@ -21,6 +29,8 @@ export const sourceCitationSchema: z.ZodType<SourceCitation> = z
 
 const questionBaseShape = {
   id: contentIdSchema,
+  moduleId: contentIdSchema.optional(),
+  sectionId: contentIdSchema.optional(),
   prompt: nonEmptyString,
   explanation: nonEmptyString,
   sourceCitation: sourceCitationSchema,
@@ -159,6 +169,7 @@ const sectionSchema = z
 const glossaryTermSchema = z
   .object({
     id: contentIdSchema,
+    moduleId: contentIdSchema.optional(),
     term: nonEmptyString,
     definition: nonEmptyString,
     sectionId: contentIdSchema,
@@ -289,6 +300,179 @@ export const contentBundleSchema: z.ZodType<ContentBundle> = z
     }
   });
 
+export const curriculumBundleSchema: z.ZodType<CurriculumBundle> = z
+  .object({
+    schemaVersion: z.literal(2),
+    catalogId: contentIdSchema,
+    contentVersion: nonEmptyString,
+    generatedAt: z.string().datetime({ offset: true }).optional(),
+    modules: z.array(moduleContentSchema).min(1),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const ids = new Map<string, string>();
+    const moduleIds = new Set<string>();
+    const addId = (id: string, path: (string | number)[], kind: string) => {
+      const existing = ids.get(id);
+      if (existing) {
+        context.addIssue({
+          code: 'custom',
+          path,
+          message: `Catalog content id is already used by ${existing}`,
+        });
+      } else {
+        ids.set(id, kind);
+      }
+    };
+
+    catalog.modules.forEach((module, moduleIndex) => {
+      if (moduleIds.has(module.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['modules', moduleIndex, 'id'],
+          message: 'Module ids must be unique',
+        });
+      }
+      moduleIds.add(module.id);
+      if (module.version !== catalog.contentVersion) {
+        context.addIssue({
+          code: 'custom',
+          path: ['modules', moduleIndex, 'version'],
+          message: 'Module version must match catalog contentVersion',
+        });
+      }
+      addId(module.id, ['modules', moduleIndex, 'id'], 'module');
+      module.sections.forEach((section, sectionIndex) => {
+        addId(section.id, ['modules', moduleIndex, 'sections', sectionIndex, 'id'], 'section');
+        const validateQuestion = (question: Question, path: (string | number)[]) => {
+          addId(question.id, [...path, 'id'], 'question');
+          if (question.moduleId !== module.id || question.sectionId !== section.id) {
+            context.addIssue({
+              code: 'custom',
+              path,
+              message: 'Catalog questions require matching moduleId and sectionId provenance',
+            });
+          }
+          if (!question.sourceCitation.pdfPage) {
+            context.addIssue({
+              code: 'custom',
+              path: [...path, 'sourceCitation', 'pdfPage'],
+              message: 'Catalog citations require a physical PDF page',
+            });
+          }
+        };
+        section.lessons.forEach((lesson, lessonIndex) => {
+          addId(
+            lesson.id,
+            ['modules', moduleIndex, 'sections', sectionIndex, 'lessons', lessonIndex, 'id'],
+            'lesson',
+          );
+          if (!lesson.sourceCitation.pdfPage) {
+            context.addIssue({
+              code: 'custom',
+              path: [
+                'modules',
+                moduleIndex,
+                'sections',
+                sectionIndex,
+                'lessons',
+                lessonIndex,
+                'sourceCitation',
+                'pdfPage',
+              ],
+              message: 'Catalog citations require a physical PDF page',
+            });
+          }
+          validateQuestion(lesson.practice, [
+            'modules',
+            moduleIndex,
+            'sections',
+            sectionIndex,
+            'lessons',
+            lessonIndex,
+            'practice',
+          ]);
+        });
+        section.quiz.forEach((question, questionIndex) =>
+          validateQuestion(question, [
+            'modules',
+            moduleIndex,
+            'sections',
+            sectionIndex,
+            'quiz',
+            questionIndex,
+          ]),
+        );
+      });
+      module.exam.forEach((question, questionIndex) => {
+        addId(question.id, ['modules', moduleIndex, 'exam', questionIndex, 'id'], 'question');
+        const sectionIds = new Set(module.sections.map((section) => section.id));
+        if (
+          question.moduleId !== module.id ||
+          !question.sectionId ||
+          !sectionIds.has(question.sectionId)
+        ) {
+          context.addIssue({
+            code: 'custom',
+            path: ['modules', moduleIndex, 'exam', questionIndex],
+            message: 'Exam questions require valid module and source-section provenance',
+          });
+        }
+        if (!question.sourceCitation.pdfPage) {
+          context.addIssue({
+            code: 'custom',
+            path: ['modules', moduleIndex, 'exam', questionIndex, 'sourceCitation', 'pdfPage'],
+            message: 'Catalog citations require a physical PDF page',
+          });
+        }
+      });
+      module.glossary.forEach((term, termIndex) => {
+        addId(term.id, ['modules', moduleIndex, 'glossary', termIndex, 'id'], 'glossary term');
+        if (term.moduleId !== module.id) {
+          context.addIssue({
+            code: 'custom',
+            path: ['modules', moduleIndex, 'glossary', termIndex, 'moduleId'],
+            message: 'Catalog glossary terms require matching module provenance',
+          });
+        }
+        if (!term.sourceCitation.pdfPage) {
+          context.addIssue({
+            code: 'custom',
+            path: ['modules', moduleIndex, 'glossary', termIndex, 'sourceCitation', 'pdfPage'],
+            message: 'Catalog citations require a physical PDF page',
+          });
+        }
+      });
+    });
+  });
+
+export function normalizeCurriculum(input: unknown): CurriculumBundle {
+  const catalog = curriculumBundleSchema.safeParse(input);
+  if (catalog.success) return catalog.data;
+
+  const module = normalizeContent(input);
+  return {
+    schemaVersion: 2,
+    catalogId: 'preflight-faa-curriculum',
+    contentVersion: module.version,
+    modules: [module],
+  };
+}
+
+export function overlayCurriculum(
+  bundled: CurriculumBundle,
+  candidate: CurriculumBundle,
+): CurriculumBundle {
+  if (candidate.modules.length > 1) return candidate;
+  const overlays = new Map(candidate.modules.map((module) => [module.id, module]));
+  return {
+    ...bundled,
+    contentVersion: candidate.contentVersion,
+    generatedAt: candidate.generatedAt ?? bundled.generatedAt,
+    modules: bundled.modules.map((module) => overlays.get(module.id) ?? module),
+  };
+}
+
 export function normalizeContent(input: unknown): ModuleContent {
   const direct = moduleContentSchema.safeParse(input);
   if (direct.success) return direct.data;
@@ -326,7 +510,9 @@ export function safeParseModuleContent(
 
 export interface ContentManifest {
   schemaVersion: number;
-  moduleId: string;
+  moduleId?: string;
+  catalogId?: string;
+  moduleIds?: string[];
   contentVersion: string;
   bundleUrl: string;
   checksum: string;
@@ -338,7 +524,9 @@ export interface ContentManifest {
 export const contentManifestSchema: z.ZodType<ContentManifest> = z
   .object({
     schemaVersion: z.number().int().positive(),
-    moduleId: contentIdSchema,
+    moduleId: contentIdSchema.optional(),
+    catalogId: contentIdSchema.optional(),
+    moduleIds: z.array(contentIdSchema).min(1).optional(),
     contentVersion: nonEmptyString,
     bundleUrl: z.string().url(),
     checksum: z.string().regex(/^[a-fA-F0-9]{64}$/, 'Expected a SHA-256 checksum'),
@@ -346,11 +534,30 @@ export const contentManifestSchema: z.ZodType<ContentManifest> = z
     byteLength: z.number().int().positive().optional(),
     createdAt: z.string().datetime({ offset: true }),
   })
-  .strict();
+  .strict()
+  .superRefine((manifest, context) => {
+    if (manifest.schemaVersion >= 2) {
+      if (!manifest.catalogId || !manifest.moduleIds?.length) {
+        context.addIssue({
+          code: 'custom',
+          path: ['catalogId'],
+          message: 'Schema-v2 manifests require catalogId and ordered moduleIds',
+        });
+      }
+    } else if (!manifest.moduleId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['moduleId'],
+        message: 'Schema-v1 manifests require moduleId',
+      });
+    }
+  });
 
 export interface StoredContent {
   manifest: ContentManifest;
   raw: string;
+  catalog: CurriculumBundle;
+  /** First module retained for schema-v1 callers and migrations. */
   module: ModuleContent;
 }
 
@@ -406,13 +613,22 @@ export async function validateContentPayload(
   } catch {
     throw new Error('Downloaded content is not valid JSON');
   }
-  const module = normalizeContent(json);
-  if (module.id !== manifest.moduleId)
+  const catalog = normalizeCurriculum(json);
+  if (manifest.schemaVersion >= 2) {
+    if (catalog.catalogId !== manifest.catalogId) {
+      throw new Error('Downloaded catalog id does not match the manifest');
+    }
+    const moduleIds = catalog.modules.map((module) => module.id);
+    if (JSON.stringify(moduleIds) !== JSON.stringify(manifest.moduleIds)) {
+      throw new Error('Downloaded module order does not match the manifest');
+    }
+  } else if (catalog.modules[0]?.id !== manifest.moduleId) {
     throw new Error('Downloaded module id does not match the manifest');
-  if (module.version !== manifest.contentVersion) {
+  }
+  if (catalog.contentVersion !== manifest.contentVersion) {
     throw new Error('Downloaded content version does not match the manifest');
   }
-  return { manifest, raw, module };
+  return { manifest, raw, catalog, module: catalog.modules[0] };
 }
 
 function versionParts(value: string): number[] | null {
@@ -471,9 +687,11 @@ export async function updateContentFromManifest(
   try {
     const manifest = contentManifestSchema.parse(manifestInput);
     if (!dependencies.force && active) {
-      if (manifest.moduleId !== active.module.id) {
-        throw new Error('Remote manifest module id does not match active content');
-      }
+      const sameIdentity =
+        manifest.schemaVersion >= 2
+          ? manifest.catalogId === active.catalog.catalogId
+          : manifest.moduleId === active.module.id;
+      if (!sameIdentity) throw new Error('Remote manifest identity does not match active content');
       const sameRelease =
         active.manifest.checksum.toLowerCase() === manifest.checksum.toLowerCase() &&
         active.manifest.contentVersion === manifest.contentVersion;

@@ -131,11 +131,16 @@ function questionFromDocument(
   document: UnknownDocument,
   acsIndex: Map<string, UnknownDocument>,
   figureIndex: Map<string, UnknownDocument>,
+  sectionIndex: Map<string, UnknownDocument>,
+  moduleId: string,
 ): CanonicalQuestion {
   const id = stringValue(document.stableId, `stable ID for ${document._id}`)
   const type = stringValue(document.questionType, `question type for ${id}`)
+  const section = dereference(sectionIndex, document.section, `section for ${id}`)
   const base = {
     id,
+    moduleId,
+    sectionId: stringValue(section.stableId, `section stable ID for ${id}`),
     prompt: portableTextToPlain(document.prompt),
     explanation: portableTextToPlain(document.explanation),
     sourceCitation: firstCitation(document),
@@ -157,7 +162,7 @@ function questionFromDocument(
     const citation = firstCitation(figure)
     const originalFilename =
       typeof figure.originalFilename === 'string' && figure.originalFilename
-        ? `assets/phak/${path.basename(figure.originalFilename)}`
+        ? `assets/${moduleId}/${path.basename(figure.originalFilename)}`
         : undefined
     return {
       ...base,
@@ -320,11 +325,14 @@ async function main() {
   )
   const figureIndex = indexDocuments(figures)
 
+  const moduleId = stringValue(moduleDocument.stableId, 'module stable ID')
   const convertQuestion = (referenceValue: unknown) =>
     questionFromDocument(
       dereference(questionIndex, referenceValue, 'question'),
       acsIndex,
       figureIndex,
+      sectionIndex,
+      moduleId,
     )
 
   const canonicalSections = dereferenceMany(
@@ -370,6 +378,7 @@ async function main() {
     )
     return {
       id: stringValue(termDocument.stableId, `stable ID for ${termDocument._id}`),
+      moduleId,
       term: stringValue(termDocument.term, `term for ${termDocument._id}`),
       definition: portableTextToPlain(termDocument.definition),
       sectionId: stringValue(sectionDocument.stableId, `section stable ID for ${termDocument._id}`),
@@ -380,7 +389,7 @@ async function main() {
 
   const moduleCitation = firstCitation(moduleDocument)
   const module: ModuleContent = {
-    id: stringValue(moduleDocument.stableId, 'module stable ID'),
+    id: moduleId,
     title: stringValue(moduleDocument.title, 'module title'),
     shortTitle:
       typeof moduleDocument.subtitle === 'string' && moduleDocument.subtitle
@@ -437,7 +446,7 @@ async function main() {
   })
 
   await mkdir(options.outputDirectory, {recursive: true})
-  const bundlePath = path.join(options.outputDirectory, 'phak.json')
+  const bundlePath = path.join(options.outputDirectory, `${validatedModule.id}.json`)
   const manifestPath = path.join(options.outputDirectory, 'manifest.json')
   await atomicWrite(bundlePath, bundleRaw)
   await atomicWrite(manifestPath, manifestRaw)
