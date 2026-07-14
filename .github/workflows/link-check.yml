@@ -1,0 +1,128 @@
+name: Link check
+
+# Validates that every FAA source URL and documentation link in the repo still
+# resolves. Each question in the app cites an FAA handbook page; if those URLs
+# rot, the citation traceability that currently stands in for a CFI review
+# quietly breaks. See scripts/content/README.md for the content pipeline.
+#
+# Two triggers, two behaviours:
+#   * Pull requests that touch docs or the FAA source config -> broken links
+#     FAIL the job, because the change under review is the likely cause.
+#   * Weekly schedule and manual dispatch -> link rot happens on faa.gov's
+#     schedule, not ours, so a failure OPENS (or updates) a tracking issue
+#     instead of leaving a red status nobody watches. It never blocks an
+#     unrelated PR, and it closes the issue again once the links recover.
+on:
+  schedule:
+    # Weekly, Monday 06:17 UTC. The off-the-hour minute dodges the top-of-hour
+    # load spike on GitHub's shared cron scheduler.
+    - cron: '17 6 * * 1'
+  pull_request:
+    # Only docs and the files that carry FAA source URLs are worth re-checking
+    # on a PR; unrelated code changes should not pay for a network link scan.
+    paths:
+      - '**/*.md'
+      - 'scripts/content/phak_config.py'
+      - 'src/content/phak.json'
+      - 'studio/scripts/seed-phak.ts'
+      - 'lychee.toml'
+      - '.github/workflows/link-check.yml'
+  workflow_dispatch:
+
+# Only the newest commit on a ref needs to gate; cancel superseded runs.
+concurrency:
+  group: link-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Required only by the scheduled/dispatch path so it can file a tracking
+  # issue. Every issue step below is gated to non-pull_request events, so PR
+  # runs never exercise this scope (and fork PRs get a read-only token anyway).
+  issues: write
+
+jobs:
+  link-check:
+    name: Check FAA source and doc links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # lychee reads its settings (30s timeout and retries for a slow faa.gov, a
+      # browser user-agent, and the example.com/.invalid placeholder excludes)
+      # from ./lychee.toml. The .md glob plus the three non-markdown files below
+      # cover every doc and every place an FAA source URL is configured; lychee
+      # extracts URLs from the .py/.json/.ts files as plaintext and
+      # de-duplicates (267 references collapse to ~14 unique requests).
+      - name: Check links
+        id: lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --config ./lychee.toml
+            --no-progress
+            '**/*.md'
+            scripts/content/phak_config.py
+            src/content/phak.json
+            studio/scripts/seed-phak.ts
+          # PRs: fail so a broken link blocks the docs change under review.
+          # Schedule/dispatch: don't fail — the issue steps below react instead.
+          fail: ${{ github.event_name == 'pull_request' }}
+        env:
+          # Lets lychee authenticate github.com checks and avoid the low
+          # unauthenticated API rate limit that otherwise flakes on shared
+          # Actions runner IPs.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---------------------------------------------------------------------
+      # Scheduled / manual path only. On a PR these steps are skipped, so a
+      # broken link there simply leaves the failed job above as a red gate.
+      # ---------------------------------------------------------------------
+
+      - name: File or update a tracking issue for broken links
+        if: ${{ github.event_name != 'pull_request' && steps.lychee.outputs.exit_code != 0 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Idempotent: create the label on first use, update it thereafter.
+          gh label create link-rot \
+            --color B60205 \
+            --description 'Broken links found by the scheduled link check' \
+            --force
+          {
+            echo 'The scheduled link check found broken or unreachable links.'
+            echo 'Each entry below failed after retries — fix the source, or add'
+            echo 'a known-flaky host to the excludes in `lychee.toml`. This issue'
+            echo 'closes itself automatically once the links recover.'
+            echo
+            cat ./lychee/out.md
+          } > issue-body.md
+          title='🔗 Broken links detected by the scheduled link check'
+          existing="$(gh issue list --state open --label link-rot \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "Updating existing issue #$existing"
+            gh issue comment "$existing" --body-file issue-body.md
+          else
+            echo 'Opening a new tracking issue'
+            gh issue create --title "$title" --label link-rot \
+              --body-file issue-body.md
+          fi
+
+      - name: Close the tracking issue once links recover
+        if: ${{ github.event_name != 'pull_request' && steps.lychee.outputs.exit_code == 0 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Tolerate a missing label: no failure has filed an issue yet.
+          open="$(gh issue list --state open --label link-rot \
+            --json number --jq '.[].number' 2>/dev/null || true)"
+          for number in $open; do
+            echo "Closing resolved issue #$number"
+            gh issue comment "$number" \
+              --body "✅ All links resolved as of $(date -u '+%Y-%m-%d %H:%M UTC'). Closing automatically."
+            gh issue close "$number" --reason completed
+          done
