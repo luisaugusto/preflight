@@ -1,13 +1,16 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image, type ImageSource } from 'expo-image';
+import * as Linking from 'expo-linking';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { FIGURE_ASSETS } from '@/content/figure-assets';
 import type { Question } from '@/lib/content/types';
 import { Card, Feedback, Option, PrimaryButton } from '@/components/ui';
 import { colors, fonts, type } from '@/theme';
+
+const CONTENT_REPORT_EMAIL = 'support@preflight.study';
 
 export function QuestionInteraction({
   question,
@@ -123,6 +126,7 @@ export function QuestionInteraction({
           disabled={!ready}
           onPress={() => (checked ? onComplete(correct) : setChecked(true))}
         />
+        <QuestionReport question={question} />
         <Citation question={question} />
       </View>
     );
@@ -182,6 +186,7 @@ export function QuestionInteraction({
         disabled={!ready}
         onPress={() => (checked ? onComplete(correct) : setChecked(true))}
       />
+      <QuestionReport question={question} />
       <Citation question={question} />
     </View>
   );
@@ -288,6 +293,97 @@ function ZoomModal({
   );
 }
 
+function QuestionReport({ question }: { question: Question }) {
+  const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState('');
+
+  const close = () => {
+    setOpen(false);
+    setDetails('');
+  };
+
+  const sendReport = () => {
+    const subject = `Preflight content report: ${question.id}`;
+    const body = [
+      'I found a content issue while studying:',
+      '',
+      details.trim() || '[Describe what looks wrong or confusing here.]',
+      '',
+      '--- Question context ---',
+      `Question ID: ${question.id}`,
+      `Type: ${question.type}`,
+      `Prompt: ${question.prompt}`,
+      `Source: ${question.sourceCitation.handbook}, chapter ${question.sourceCitation.chapter}, page ${question.sourceCitation.page}`,
+      `ACS: ${question.acsCodes.join(', ') || 'None listed'}`,
+    ].join('\n');
+    const url = `mailto:${CONTENT_REPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    void Linking.openURL(url)
+      .then(() => close())
+      .catch(() => {
+        Alert.alert(
+          'Unable to open email',
+          `Please send your note to ${CONTENT_REPORT_EMAIL} and include question ${question.id}.`,
+        );
+      });
+  };
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Report a content issue with this question"
+        style={({ pressed }) => [styles.reportButton, pressed && styles.reportButtonPressed]}
+      >
+        <MaterialCommunityIcons name="flag-outline" size={16} color={colors.magenta} />
+        <Text style={styles.reportButtonText}>REPORT CONTENT ISSUE</Text>
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+        <View style={styles.reportBackdrop}>
+          <Card style={styles.reportModal} accent={colors.magenta}>
+            <View style={styles.reportHeader}>
+              <View style={styles.reportTitleRow}>
+                <MaterialCommunityIcons name="flag-outline" size={21} color={colors.magenta} />
+                <Text style={styles.reportTitle}>Report this question</Text>
+              </View>
+              <Pressable
+                onPress={close}
+                accessibilityRole="button"
+                accessibilityLabel="Close report form"
+                hitSlop={12}
+              >
+                <MaterialCommunityIcons name="close" size={23} color={colors.ink} />
+              </Pressable>
+            </View>
+            <Text style={styles.reportHelp}>
+              Capture typos, wrong answers, bad explanations, source problems, or anything that
+              feels off. We&apos;ll include the question ID and citation automatically.
+            </Text>
+            <TextInput
+              value={details}
+              onChangeText={setDetails}
+              multiline
+              placeholder="What should we fix?"
+              placeholderTextColor={colors.faint}
+              accessibilityLabel="Content issue details"
+              style={styles.reportInput}
+              textAlignVertical="top"
+            />
+            <View style={styles.reportMeta}>
+              <Text style={styles.reportMetaText}>Question {question.id}</Text>
+              <Text style={styles.reportMetaText}>
+                {question.sourceCitation.handbook} · p. {question.sourceCitation.page}
+              </Text>
+            </View>
+            <PrimaryButton label="SEND REPORT" icon="email-outline" onPress={sendReport} />
+          </Card>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 function Citation({ question }: { question: Question }) {
   return (
     <View style={styles.citation}>
@@ -375,6 +471,48 @@ const styles = StyleSheet.create({
     backgroundColor: colors.greenPale,
   },
   definitionText: { ...type.body, flex: 1, fontSize: 15, lineHeight: 20 },
+  reportButton: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: colors.magentaPale,
+  },
+  reportButtonPressed: { opacity: 0.72 },
+  reportButtonText: {
+    fontFamily: fonts.strong,
+    fontSize: 11,
+    letterSpacing: 1.1,
+    color: colors.magenta,
+  },
+  reportBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 22,
+    backgroundColor: '#071B2CCC',
+  },
+  reportModal: { gap: 13, borderWidth: 1.5 },
+  reportHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reportTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reportTitle: { fontFamily: fonts.display, fontSize: 22, color: colors.ink },
+  reportHelp: { ...type.small, color: colors.body },
+  reportInput: {
+    minHeight: 128,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    borderRadius: 12,
+    padding: 12,
+    fontFamily: fonts.regular,
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.ink,
+    backgroundColor: colors.paper,
+  },
+  reportMeta: { gap: 2 },
+  reportMetaText: { fontFamily: fonts.regular, fontSize: 12, color: colors.muted },
   citation: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
   citationText: { fontFamily: fonts.regular, fontSize: 12, color: colors.muted },
   modal: {
