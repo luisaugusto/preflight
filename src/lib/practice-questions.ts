@@ -4,18 +4,46 @@ import {
   generateWeatherDecoding,
   generateWeightAndBalance,
 } from './calculations';
-import type { ModuleContent, NumericQuestion, Question, SourceCitation } from './content/types';
+import type { ModuleContent, NumericQuestion, Question, Section } from './content/types';
 
 function normalizeText(value: string): string {
   return value.trim().toLocaleLowerCase('en-US').replace(/\s+/g, ' ');
 }
 
-export function buildVocabularyQuestions(module: ModuleContent): Question[] {
-  return module.glossary.map((term, index) => {
+function moduleList(input: ModuleContent | readonly ModuleContent[]): readonly ModuleContent[] {
+  return Array.isArray(input) ? input : [input as ModuleContent];
+}
+
+export function getEligibleSections(
+  modules: ModuleContent | readonly ModuleContent[],
+  completedSectionIds?: ReadonlySet<string>,
+): { module: ModuleContent; section: Section }[] {
+  return moduleList(modules).flatMap((module) =>
+    module.sections
+      .filter((section) => !completedSectionIds || completedSectionIds.has(section.id))
+      .map((section) => ({ module, section })),
+  );
+}
+
+export function buildVocabularyQuestions(
+  modules: ModuleContent | readonly ModuleContent[],
+  completedSectionIds?: ReadonlySet<string>,
+): Question[] {
+  const eligibleSections = new Set(
+    getEligibleSections(modules, completedSectionIds).map(({ section }) => section.id),
+  );
+  const glossary = moduleList(modules).flatMap((module) =>
+    module.glossary
+      .filter((term) => eligibleSections.has(term.sectionId))
+      .map((term) => ({ ...term, moduleId: term.moduleId ?? module.id })),
+  );
+  if (glossary.length < 4) return [];
+  const questions: Question[] = [];
+  glossary.forEach((term, index) => {
     const normalizedTerm = normalizeText(term.term);
     const distractorPool = [
       ...new Map(
-        module.glossary
+        glossary
           .filter(
             (item) =>
               item.id !== term.id &&
@@ -26,9 +54,7 @@ export function buildVocabularyQuestions(module: ModuleContent): Question[] {
       ).values(),
     ];
 
-    if (distractorPool.length < 3) {
-      throw new Error(`Vocabulary term ${term.id} needs at least three unambiguous distractors.`);
-    }
+    if (distractorPool.length < 3) return;
 
     const distractors = Array.from(
       { length: 3 },
@@ -38,8 +64,10 @@ export function buildVocabularyQuestions(module: ModuleContent): Question[] {
     const options = [...distractors];
     options.splice(correctIndex, 0, term.definition);
 
-    return {
+    questions.push({
       id: `vocab-${term.id}`,
+      moduleId: term.moduleId,
+      sectionId: term.sectionId,
       type: 'multipleChoice',
       prompt: `Which definition best matches “${term.term}”?`,
       options,
@@ -47,8 +75,9 @@ export function buildVocabularyQuestions(module: ModuleContent): Question[] {
       explanation: term.definition,
       sourceCitation: term.sourceCitation,
       acsCodes: term.acsCodes,
-    };
+    });
   });
+  return questions;
 }
 
 export function selectQuestionWindow<T>(
@@ -66,46 +95,54 @@ export function selectQuestionWindow<T>(
   );
 }
 
-export function buildCalculationQuestions(module: ModuleContent): Question[] {
+export function buildCalculationQuestions(
+  modules: ModuleContent | readonly ModuleContent[],
+  completedSectionIds?: ReadonlySet<string>,
+): Question[] {
+  const eligible = getEligibleSections(modules, completedSectionIds);
   const seed = new Date().toISOString().slice(0, 10);
   const wb = generateWeightAndBalance(seed);
   const crosswind = generateCrosswind(seed);
   const performance = generatePerformanceInterpolation(seed);
   const weather = generateWeatherDecoding(seed);
-  const citation = (chapter: string, page: string): SourceCitation => ({
-    handbook: "Pilot's Handbook of Aeronautical Knowledge",
-    edition: 'FAA-H-8083-25C',
-    chapter,
-    page,
-    url: module.source.url,
-  });
+  const findSource = (...patterns: RegExp[]) =>
+    eligible.find(({ section }) => patterns.some((pattern) => pattern.test(section.title)));
   const numeric = (
     problem: typeof wb | typeof crosswind | typeof performance,
-    chapter: string,
-    page: string,
+    source: { module: ModuleContent; section: Section },
   ): NumericQuestion => ({
     id: `practice-${problem.id}`,
+    moduleId: source.module.id,
+    sectionId: source.section.id,
     type: 'numeric',
     prompt: problem.prompt,
     answer: problem.answer,
     explanation: problem.explanation,
-    sourceCitation: citation(chapter, page),
-    acsCodes: chapter === '10' ? ['PA.I.F.K1'] : ['PA.I.F.K2'],
+    sourceCitation: source.section.lessons[0].sourceCitation,
+    acsCodes: source.section.acsCodes,
   });
 
-  return [
-    numeric(wb, '10', '10-7'),
-    numeric(crosswind, '14', '14-18'),
-    numeric(performance, '11', '11-15'),
-    {
+  const questions: Question[] = [];
+  const weightAndBalance = findSource(/Weight and Balance/i);
+  const crosswindSource = findSource(/Takeoffs|Landings|Traffic Patterns/i);
+  const performanceSource = findSource(/Performance/i, /Energy Management/i);
+  const weatherSource = findSource(/Weather Services/i, /Observations|METAR/i);
+  if (weightAndBalance) questions.push(numeric(wb, weightAndBalance));
+  if (crosswindSource) questions.push(numeric(crosswind, crosswindSource));
+  if (performanceSource) questions.push(numeric(performance, performanceSource));
+  if (weatherSource) {
+    questions.push({
       id: `practice-${weather.id}`,
+      moduleId: weatherSource.module.id,
+      sectionId: weatherSource.section.id,
       type: 'multipleChoice',
       prompt: weather.prompt,
       options: weather.options,
       correctIndex: weather.correctIndex,
       explanation: weather.explanation,
-      sourceCitation: citation('13', '13-12'),
-      acsCodes: ['PA.I.C.K3'],
-    },
-  ];
+      sourceCitation: weatherSource.section.lessons[0].sourceCitation,
+      acsCodes: weatherSource.section.acsCodes,
+    });
+  }
+  return questions;
 }

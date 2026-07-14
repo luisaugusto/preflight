@@ -10,8 +10,9 @@ export const API_VERSION = '2026-07-12'
 
 export const studioRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 export const repositoryRoot = path.resolve(studioRoot, '..')
-export const canonicalContentPath = path.join(repositoryRoot, 'src/content/phak.json')
-export const figureAssetsPath = path.join(repositoryRoot, 'assets/phak')
+export const canonicalContentPath = path.join(repositoryRoot, 'src/content/catalog.json')
+export const figureAssetsPath = (moduleId: string) =>
+  path.join(repositoryRoot, 'assets', normalizeId(moduleId))
 
 const nonEmptyString = z.string().trim().min(1)
 const contentId = nonEmptyString.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
@@ -24,11 +25,15 @@ export const sourceCitationSchema = z
     page: z.union([nonEmptyString, z.number().int().positive()]),
     url: z.string().url(),
     figure: nonEmptyString.optional(),
+    pdfPage: z.number().int().positive(),
+    pdfPageEnd: z.number().int().positive().optional(),
   })
   .strict()
 
 const baseQuestionSchema = z.object({
   id: contentId,
+  moduleId: contentId,
+  sectionId: contentId,
   prompt: nonEmptyString,
   explanation: nonEmptyString,
   sourceCitation: sourceCitationSchema,
@@ -171,6 +176,7 @@ export const moduleContentSchema = z
           id: contentId,
           term: nonEmptyString,
           definition: nonEmptyString,
+          moduleId: contentId,
           sectionId: contentId,
           sourceCitation: sourceCitationSchema,
           acsCodes: z.array(nonEmptyString).min(1),
@@ -211,13 +217,106 @@ export const moduleContentSchema = z
     })
   })
 
+export const curriculumCatalogSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    catalogId: contentId,
+    contentVersion: nonEmptyString,
+    generatedAt: z.string().datetime(),
+    modules: z.array(moduleContentSchema).min(1),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const moduleIds = new Set<string>()
+    const contentIds = new Set<string>()
+    const addContentId = (id: string, pathParts: (string | number)[]) => {
+      if (contentIds.has(id)) {
+        context.addIssue({code: 'custom', path: pathParts, message: `Duplicate catalog ID: ${id}`})
+      }
+      contentIds.add(id)
+    }
+
+    catalog.modules.forEach((module, moduleIndex) => {
+      if (moduleIds.has(module.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['modules', moduleIndex, 'id'],
+          message: `Duplicate module ID: ${module.id}`,
+        })
+      }
+      moduleIds.add(module.id)
+      addContentId(module.id, ['modules', moduleIndex, 'id'])
+
+      const sectionIds = new Set(module.sections.map((section) => section.id))
+      module.sections.forEach((section, sectionIndex) => {
+        addContentId(section.id, ['modules', moduleIndex, 'sections', sectionIndex, 'id'])
+        section.lessons.forEach((lesson, lessonIndex) => {
+          addContentId(lesson.id, [
+            'modules',
+            moduleIndex,
+            'sections',
+            sectionIndex,
+            'lessons',
+            lessonIndex,
+            'id',
+          ])
+          if (lesson.practice.moduleId !== module.id || lesson.practice.sectionId !== section.id) {
+            context.addIssue({
+              code: 'custom',
+              path: [
+                'modules',
+                moduleIndex,
+                'sections',
+                sectionIndex,
+                'lessons',
+                lessonIndex,
+                'practice',
+              ],
+              message: 'Practice question provenance does not match its module and section.',
+            })
+          }
+        })
+        section.quiz.forEach((question, questionIndex) => {
+          if (question.moduleId !== module.id || question.sectionId !== section.id) {
+            context.addIssue({
+              code: 'custom',
+              path: ['modules', moduleIndex, 'sections', sectionIndex, 'quiz', questionIndex],
+              message: 'Quiz question provenance does not match its module and section.',
+            })
+          }
+        })
+      })
+
+      module.exam.forEach((question, questionIndex) => {
+        if (question.moduleId !== module.id || !sectionIds.has(question.sectionId)) {
+          context.addIssue({
+            code: 'custom',
+            path: ['modules', moduleIndex, 'exam', questionIndex],
+            message: 'Exam question provenance does not match its module.',
+          })
+        }
+      })
+      module.glossary.forEach((term, termIndex) => {
+        addContentId(term.id, ['modules', moduleIndex, 'glossary', termIndex, 'id'])
+        if (term.moduleId !== module.id || !sectionIds.has(term.sectionId)) {
+          context.addIssue({
+            code: 'custom',
+            path: ['modules', moduleIndex, 'glossary', termIndex],
+            message: 'Glossary provenance does not match its module.',
+          })
+        }
+      })
+    })
+  })
+
 export type SourceCitation = z.infer<typeof sourceCitationSchema>
 export type CanonicalQuestion = z.infer<typeof questionSchema>
 export type ModuleContent = z.infer<typeof moduleContentSchema>
+export type CurriculumCatalog = z.infer<typeof curriculumCatalogSchema>
 export type CanonicalSection = ModuleContent['sections'][number]
 export type CanonicalLesson = CanonicalSection['lessons'][number]
 
-export async function loadCanonicalModule(): Promise<ModuleContent> {
+export async function loadCanonicalCatalog(): Promise<CurriculumCatalog> {
   let raw: string
   try {
     raw = await readFile(canonicalContentPath, 'utf8')
@@ -234,7 +333,7 @@ export async function loadCanonicalModule(): Promise<ModuleContent> {
     throw new Error(`Invalid JSON in ${canonicalContentPath}: ${message}`)
   }
 
-  return moduleContentSchema.parse(parsed)
+  return curriculumCatalogSchema.parse(parsed)
 }
 
 export function normalizeId(value: string): string {
@@ -320,7 +419,7 @@ export function toSanityCitation(citation: SourceCitation) {
     url: citation.url,
     ...(chapterMatch ? {chapterNumber: Number(chapterMatch[0])} : {}),
     chapterTitle: citation.chapter,
-    pageNumber: printedPageNumber(citation.page),
+    pageNumber: citation.pdfPage,
     pageLabel: String(citation.page),
     ...(citation.figure ? {figureNumber: citation.figure} : {}),
     note: 'Imported from the canonical Preflight source citation.',
@@ -347,6 +446,10 @@ export function fromSanityCitation(value: Record<string, unknown>): SourceCitati
         : `Chapter ${typeof value.chapterNumber === 'number' ? value.chapterNumber : '?'}`,
     page: pageLabel,
     url: value.url,
+    pdfPage:
+      typeof value.pageNumber === 'number'
+        ? Math.max(1, Math.trunc(value.pageNumber))
+        : printedPageNumber(pageLabel),
     ...(typeof value.figureNumber === 'string' && value.figureNumber
       ? {figure: value.figureNumber}
       : {}),

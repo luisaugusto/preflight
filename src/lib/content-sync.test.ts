@@ -1,10 +1,13 @@
 /// <reference types="jest" />
 
 import type { ModuleContent, MultipleChoiceQuestion, SourceCitation } from './content/types';
+import catalogJson from '../content/catalog.json';
 import {
   MemoryContentStore,
   compareContentVersions,
   normalizeContent,
+  normalizeCurriculum,
+  overlayCurriculum,
   safeParseModuleContent,
   updateContentFromManifest,
   validateContentPayload,
@@ -137,6 +140,45 @@ describe('content validation', () => {
     await expect(
       validateContentPayload(raw, { ...manifest('2.0.0'), moduleId: 'other' }, hash),
     ).rejects.toThrow('module id');
+  });
+
+  it('accepts the four-module schema-v2 catalog and ordered manifest', async () => {
+    const catalog = normalizeCurriculum(catalogJson);
+    const raw = JSON.stringify(catalogJson);
+    const v2Manifest: ContentManifest = {
+      schemaVersion: 2,
+      catalogId: catalog.catalogId,
+      moduleIds: catalog.modules.map((module) => module.id),
+      contentVersion: catalog.contentVersion,
+      bundleUrl: 'https://cdn.example.com/catalog.json',
+      checksum: 'c'.repeat(64),
+      algorithm: 'sha256',
+      createdAt: '2026-07-14T00:00:00.000Z',
+    };
+
+    await expect(
+      validateContentPayload(raw, v2Manifest, async () => 'c'.repeat(64)),
+    ).resolves.toMatchObject({
+      catalog: { catalogId: 'preflight-faa-curriculum' },
+      module: { id: 'phak' },
+    });
+    await expect(
+      validateContentPayload(
+        raw,
+        { ...v2Manifest, moduleIds: ['afh', 'phak', 'awh', 'rmh'] },
+        async () => 'c'.repeat(64),
+      ),
+    ).rejects.toThrow('module order');
+  });
+
+  it('overlays a schema-v1 PHAK update without removing the other modules', () => {
+    const bundled = normalizeCurriculum(catalogJson);
+    const candidate = normalizeCurriculum(makeModule('2.0.0'));
+    const overlaid = overlayCurriculum(bundled, candidate);
+
+    expect(overlaid.modules.map((module) => module.id)).toEqual(['phak', 'afh', 'awh', 'rmh']);
+    expect(overlaid.modules[0].version).toBe('2.0.0');
+    expect(overlaid.modules[1]).toEqual(bundled.modules[1]);
   });
 
   it('compares semantic versions numerically', () => {

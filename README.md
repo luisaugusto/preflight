@@ -1,6 +1,6 @@
 # Preflight
 
-Preflight is an iOS-first Expo/React Native microlearning app for the FAA Private Pilot written test. This MVP ships the complete _Pilot's Handbook of Aeronautical Knowledge_ (FAA-H-8083-25C) as 17 cited sections with active lessons, four question types, section quizzes, a module exam, spaced repetition, vocabulary, and calculation practice.
+Preflight is an iOS-first Expo/React Native microlearning app for the FAA Private Pilot written test. It ships four cited FAA modules: the _Pilot's Handbook of Aeronautical Knowledge_, _Airplane Flying Handbook_, _Aviation Weather Handbook_, and _Risk Management Handbook_. Each module has its own route and progress, while Practice combines only material from completed sections across the full curriculum.
 
 ## Run the app
 
@@ -53,19 +53,20 @@ As a defense-in-depth complement to the CI gate, enable GitHub's native **secret
 
 ## Content pipeline
 
-The reproducible handbook pipeline is documented in [scripts/content/README.md](./scripts/content/README.md). It pins the official FAA PDF checksum, extracts chapter text and representative figures, builds `src/content/phak.json`, and rejects invalid citations, ACS tags, answer keys, numeric specifications, or image references.
+The reproducible handbook pipeline is documented in [scripts/content/README.md](./scripts/content/README.md). It pins all four official FAA sources, extracts handbook text and representative figures, builds `src/content/catalog.json`, and rejects invalid coverage, citations, ACS tags, answer keys, provenance, or image references.
 
 A weekly [link check](./.github/workflows/link-check.yml) (via [lychee](https://github.com/lycheeverse/lychee)) validates the FAA source URLs configured in this pipeline alongside every Markdown link, so a rotted citation can't silently break traceability. It fails any pull request that touches docs and, on the scheduled run, opens a self-closing tracking issue instead of blocking unrelated work. Known-flaky and placeholder hosts are allowlisted in [lychee.toml](./lychee.toml).
 
 Current bundle:
 
-- 17 sections
-- 51 microlessons
-- 68 section-quiz questions
-- 30 module-exam questions
-- 51 glossary terms
-- 17 bundled FAA figures
-- 149 unique questions across multiple choice, numeric, matching, and image formats
+- 4 modules
+- 89 sections
+- 390 microlessons
+- 356 section-quiz questions
+- 120 module-exam questions
+- 267 glossary terms
+- 89 bundled FAA figures
+- 866 unique questions across multiple choice, numeric, matching, and image formats
 
 ## Sanity Studio
 
@@ -78,24 +79,25 @@ npm run studio
 npm run studio:deploy-schema
 ```
 
-After authenticating the Sanity CLI, seed the complete PHAK module and assets as idempotent drafts for review:
+After authenticating the Sanity CLI, validate the complete catalog without mutations, then publish all four modules, assets, and the schema-v2 release:
 
 ```sh
 cd studio
 npm run schema:deploy
-npm run seed:phak:cli
+npm run seed:catalog:dry-run
+npm run seed:catalog:cli
 ```
 
 Alternatively, provide a server-side Editor token only to the seed process:
 
 ```sh
 cd studio
-SANITY_AUTH_TOKEN=... npm run seed:phak
+SANITY_AUTH_TOKEN=... npm run seed:catalog -- --publish
 ```
 
-Never expose that token through an `EXPO_PUBLIC_` variable or bundle it into the app. The import creates or replaces 326 stable draft documents and uploads the content bundle, manifest, and 17 figures to Sanity's CDN. This intentionally preserves the PID's human-review gate; content is not auto-published.
+Never expose that token through an `EXPO_PUBLIC_` variable or bundle it into the app. The idempotent import creates or replaces 1,745 published curriculum documents, uploads 89 figures, and uploads the checksum-verified catalog and manifest to Sanity's CDN. Omitting `--publish` writes review drafts instead.
 
-Validate every live draft and its references with:
+Validate every live document and its references with:
 
 ```sh
 cd studio

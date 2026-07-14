@@ -1,9 +1,4 @@
-/**
- * Canonical, platform-independent content contract for the Preflight PHAK module.
- *
- * `phak.json` is a single {@link ModuleContent} object. Runtime sync may wrap it
- * in a manifest, but callers should always normalize back to this shape.
- */
+/** Canonical, platform-independent content contracts for the Preflight curriculum. */
 
 export type ContentId = string;
 export type AcsCode = string;
@@ -14,6 +9,10 @@ export interface SourceCitation {
   chapter: string;
   /** Printed handbook page, for example `3-7`. */
   page: string | number;
+  /** One-based physical page in the pinned source PDF. */
+  pdfPage?: number;
+  /** Optional inclusive physical end page for a cited range. */
+  pdfPageEnd?: number;
   url: string;
   figure?: string;
 }
@@ -57,6 +56,9 @@ export interface MatchingPair {
 
 interface BaseQuestion {
   id: ContentId;
+  /** Owning module and source section; required by catalog-wide practice. */
+  moduleId?: ContentId;
+  sectionId?: ContentId;
   prompt: string;
   explanation: string;
   sourceCitation: SourceCitation;
@@ -115,6 +117,7 @@ export interface Section {
 
 export interface GlossaryTerm {
   id: ContentId;
+  moduleId?: ContentId;
   term: string;
   definition: string;
   sectionId: ContentId;
@@ -134,13 +137,24 @@ export interface ModuleContent {
   glossary: GlossaryTerm[];
 }
 
-/** Optional network envelope; this is not the checked-in `phak.json` shape. */
+/** Legacy schema-v1 network envelope. */
 export interface ContentBundle {
   schemaVersion: number;
   contentVersion: string;
   generatedAt?: string;
   module: ModuleContent;
 }
+
+/** Atomic schema-v2 curriculum used by bundled and remotely synchronized content. */
+export interface CurriculumBundle {
+  schemaVersion: 2;
+  catalogId: ContentId;
+  contentVersion: string;
+  generatedAt?: string;
+  modules: ModuleContent[];
+}
+
+export type CurriculumContent = CurriculumBundle;
 
 export type ContentEntityType = 'module' | 'section' | 'lesson' | 'question' | 'glossaryTerm';
 

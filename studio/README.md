@@ -20,24 +20,24 @@ npm run schema:deploy
 
 Schema deployment requires a logged-in Sanity CLI session with access to the project, or a suitable `SANITY_AUTH_TOKEN`.
 
-## PHAK ingestion
+## Catalog ingestion
 
-The importer reads `../src/content/phak.json` and `../assets/phak`, uploads the representative figures and a canonical JSON bundle, then seeds deterministic draft documents for human review. Re-running it updates the same draft IDs instead of producing duplicates.
+The importer reads `../src/content/catalog.json` plus all four module asset directories, uploads 89 representative figures and a schema-v2 JSON bundle, then creates deterministic documents. Re-running it updates the same IDs instead of producing duplicates.
 
 ```sh
-# Fully validate and compile the import without network writes or a token
-npm run seed:phak:dry-run
+# Fully validate the published-document shape without network writes or a token
+npm run seed:catalog:dry-run
 
-# Seed assets and draft documents (requires a server-side Editor token)
-SANITY_AUTH_TOKEN=... npm run seed:phak
+# Publish all four modules (requires a server-side Editor token)
+SANITY_AUTH_TOKEN=... npm run seed:catalog -- --publish
 
 # Or use the authenticated Sanity CLI session
-npm run seed:phak:cli
+npm run seed:catalog:cli
 ```
 
-The token is read only from the environment and is never printed. The seed command writes to `drafts.*` IDs in project `4qoowg94`, dataset `production`; generated content is not auto-published.
+The token is read only from the environment and is never printed. With `--publish`, the seed command writes published IDs in project `4qoowg94`, dataset `production`; without it, the command writes review drafts.
 
-The curriculum graph is cyclic and draft-only during editorial review, so explicit content references are schema-weak and stored with `_weak: true`; Sanity image/file asset references remain strong. This lets all related drafts coexist without publishing generated learning content. If strong references are required after review, use a deliberate two-phase release that publishes every target before strengthening references.
+Draft references are weakened so the cyclic curriculum graph can be staged safely. Published imports retain the schema's intended references, while Sanity image/file asset references remain strong in both modes.
 
 Validate the complete live dataset after an import:
 
@@ -49,7 +49,7 @@ For an additional local validation artifact, pass `--ndjson <path>` to the dry r
 
 ## Content bundle export
 
-The exporter reads only published Sanity documents, reconstructs the app's canonical `ModuleContent`, validates it, and atomically writes `exports/phak.json` plus `exports/manifest.json` with a SHA-256 checksum.
+The legacy module exporter reads published Sanity documents, reconstructs and validates one module, and atomically writes `exports/<module-id>.json` plus `exports/manifest.json` with a SHA-256 checksum. Runtime delivery uses the schema-v2 catalog uploaded by the catalog importer.
 
 ```sh
 npm run export:bundle:dry-run

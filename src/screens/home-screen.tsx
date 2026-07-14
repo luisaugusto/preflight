@@ -12,6 +12,8 @@ export function HomeScreen({
   onPractice,
   onInfo,
   onExam,
+  onModules,
+  moduleNumber,
 }: {
   module: ModuleContent;
   completedLessonIds: Set<string>;
@@ -20,6 +22,8 @@ export function HomeScreen({
   onPractice: () => void;
   onInfo: () => void;
   onExam: () => void;
+  onModules: () => void;
+  moduleNumber: number;
 }) {
   const sections = [...module.sections].sort((a, b) => a.order - b.order);
   const completedSections = sections.filter((section) => completedSectionIds.has(section.id));
@@ -46,7 +50,7 @@ export function HomeScreen({
       footer={<BottomNav active="path" onPath={() => undefined} onPractice={onPractice} />}
     >
       <Header
-        label="PHAK / FLIGHT PLAN"
+        label={`${module.shortTitle} / FLIGHT PLAN`}
         trailing={
           <IconButton
             name="information-outline"
@@ -57,10 +61,18 @@ export function HomeScreen({
       />
 
       <View style={styles.titleRow}>
-        <View style={styles.titleCopy}>
-          <Eyebrow>MODULE 01</Eyebrow>
-          <Text style={styles.title}>PILOT&apos;S HANDBOOK</Text>
-        </View>
+        <Pressable
+          onPress={onModules}
+          accessibilityRole="button"
+          accessibilityLabel={`Change module. Current module: ${module.title}`}
+          style={({ pressed }) => [styles.titleCopy, pressed && styles.titlePressed]}
+        >
+          <View style={styles.moduleEyebrowRow}>
+            <Eyebrow>MODULE {String(moduleNumber).padStart(2, '0')}</Eyebrow>
+            <MaterialCommunityIcons name="chevron-down" size={18} color={colors.magenta} />
+          </View>
+          <Text style={styles.title}>{module.title.toUpperCase()}</Text>
+        </Pressable>
         <View style={styles.roundel}>
           <Text style={styles.roundelValue}>{progress}</Text>
           <Text style={styles.roundelUnit}>%</Text>
@@ -91,7 +103,9 @@ export function HomeScreen({
         onPress={() => (allSectionsComplete ? onExam() : onOpenSection(activeSection))}
         accessibilityRole="button"
         accessibilityLabel={
-          allSectionsComplete ? 'Start PHAK module exam' : `Continue ${activeSection.title}`
+          allSectionsComplete
+            ? `Start ${module.shortTitle} module exam`
+            : `Continue ${activeSection.title}`
         }
       >
         <Card style={styles.continueCard} accent={colors.ink}>
@@ -102,7 +116,9 @@ export function HomeScreen({
             <MaterialCommunityIcons name="navigation-variant" size={27} color={colors.magenta} />
           </View>
           <Text style={styles.continueTitle}>
-            {allSectionsComplete ? 'PHAK MODULE EXAM' : activeSection.title.toUpperCase()}
+            {allSectionsComplete
+              ? `${module.shortTitle} MODULE EXAM`
+              : activeSection.title.toUpperCase()}
           </Text>
           <Text style={styles.continueMeta}>
             {allSectionsComplete
@@ -145,7 +161,7 @@ export function HomeScreen({
         onPress={onExam}
         disabled={!examUnlocked}
         accessibilityRole="button"
-        accessibilityLabel="PHAK module exam"
+        accessibilityLabel={`${module.shortTitle} module exam`}
         accessibilityState={{ disabled: !examUnlocked }}
       >
         <Card
@@ -166,7 +182,7 @@ export function HomeScreen({
           </View>
           <View style={styles.examCopy}>
             <Eyebrow color={examUnlocked ? colors.blue : colors.muted}>FINAL CHECK</Eyebrow>
-            <Text style={styles.examTitle}>PHAK module exam</Text>
+            <Text style={styles.examTitle}>{module.shortTitle} module exam</Text>
             <Text style={styles.examSub}>
               {examUnlocked
                 ? `${module.exam.length} questions · retakes allowed`
@@ -251,7 +267,9 @@ const styles = StyleSheet.create({
     gap: 18,
   },
   titleCopy: { flex: 1, gap: 4 },
-  title: { ...type.title, fontSize: 31, lineHeight: 34 },
+  titlePressed: { opacity: 0.7 },
+  moduleEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  title: { ...type.title, fontSize: 29, lineHeight: 32 },
   roundel: {
     width: 58,
     height: 58,
