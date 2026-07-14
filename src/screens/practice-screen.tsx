@@ -19,11 +19,17 @@ export function PracticeScreen({
   onOpen,
   onPath,
   onInfo,
+  eligibleSectionCount,
+  vocabularyCount,
+  calculationCount,
 }: {
   dueCount: number;
   onOpen: (route: PracticeRoute) => void;
   onPath: () => void;
   onInfo: () => void;
+  eligibleSectionCount: number;
+  vocabularyCount: number;
+  calculationCount: number;
 }) {
   return (
     <Screen
@@ -48,6 +54,19 @@ export function PracticeScreen({
         </Text>
       </View>
 
+      {!eligibleSectionCount ? (
+        <Card style={styles.emptyCard} accent={colors.blue}>
+          <MaterialCommunityIcons name="map-marker-path" size={27} color={colors.blue} />
+          <View style={styles.emptyCopy}>
+            <Text style={styles.emptyTitle}>Complete a section first</Text>
+            <Text style={styles.emptyText}>
+              Practice unlocks only after you have learned and passed a section check.
+            </Text>
+          </View>
+          <PrimaryButton label="RETURN TO THE ROUTE" tone="ink" onPress={onPath} />
+        </Card>
+      ) : null}
+
       <Card style={styles.dailyCard} accent={colors.magenta}>
         <View style={styles.dailyHead}>
           <View style={styles.dailyIcon}>
@@ -63,11 +82,14 @@ export function PracticeScreen({
         <Text style={styles.dailySub}>
           {dueCount
             ? `${dueCount} cards · about ${Math.max(2, Math.ceil(dueCount / 2))} min`
-            : 'Nothing due - fly a light recent-material review.'}
+            : eligibleSectionCount
+              ? 'Nothing due - fly a light review from completed sections.'
+              : 'Complete a section to unlock review cards.'}
         </Text>
         <PrimaryButton
           label={dueCount ? 'START REVIEW' : 'QUICK REVIEW'}
           onPress={() => onOpen('daily')}
+          disabled={!eligibleSectionCount}
         />
       </Card>
 
@@ -79,9 +101,10 @@ export function PracticeScreen({
         <DrillCard
           icon="alphabetical-variant"
           name="Vocabulary"
-          detail="Terms and definitions from the complete PHAK glossary"
+          detail={`${vocabularyCount} eligible terms from completed sections across all modules`}
           color={colors.blue}
           onPress={() => onOpen('vocabulary')}
+          disabled={vocabularyCount < 4}
         />
         <DrillCard
           icon="calculator-variant-outline"
@@ -89,6 +112,7 @@ export function PracticeScreen({
           detail="W&B · crosswind · performance · weather"
           color={colors.green}
           onPress={() => onOpen('calculations')}
+          disabled={!calculationCount}
         />
         <DrillCard
           icon="alert-circle-outline"
@@ -157,6 +181,10 @@ function DrillCard({
 const styles = StyleSheet.create({
   content: { paddingBottom: 120 },
   hero: { gap: 8, marginBottom: 24 },
+  emptyCard: { gap: 13, marginBottom: 18, backgroundColor: colors.bluePale, shadowOpacity: 0 },
+  emptyCopy: { gap: 3 },
+  emptyTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.ink },
+  emptyText: { ...type.small, color: colors.body },
   dailyCard: { gap: 12, borderWidth: 1.5 },
   dailyHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dailyIcon: {

@@ -11,9 +11,9 @@
     "schema:deploy": "sanity schemas deploy --verbose",
     "typegen": "sanity schema extract --enforce-required-fields && sanity typegen generate",
     "typecheck": "tsc --noEmit",
-    "seed:phak": "tsx scripts/seed-phak.ts",
-    "seed:phak:cli": "sanity exec scripts/seed-phak.ts --with-user-token",
-    "seed:phak:dry-run": "tsx scripts/seed-phak.ts --dry-run",
+    "seed:catalog": "tsx scripts/seed-catalog.ts",
+    "seed:catalog:cli": "sanity exec scripts/seed-catalog.ts --with-user-token -- --publish",
+    "seed:catalog:dry-run": "tsx scripts/seed-catalog.ts --dry-run --publish",
     "export:bundle": "tsx scripts/export-bundle.ts",
     "export:bundle:dry-run": "tsx scripts/export-bundle.ts --dry-run"
   },
