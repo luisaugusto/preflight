@@ -8,6 +8,12 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Exposed as a reusable workflow so other pipelines can gate on this exact
+  # quality gate instead of duplicating its steps (and drifting from them). The
+  # tagged-release workflow calls it: tag pushes don't match the triggers above,
+  # so calling it is the only way a release runs the identical gate on the
+  # tagged commit before any build or App Store submission.
+  workflow_call:
 
 # Only the newest commit on a ref needs to gate; cancel superseded runs.
 concurrency:

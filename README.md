@@ -102,10 +102,84 @@ npx sanity documents validate --workspace preflight --yes --level warning
 
 ## EAS
 
-`eas.json` contains development, preview, and production profiles. Configure the Expo/Apple account when ready, then run:
+`eas.json` contains development, preview, and production profiles. Build numbers
+are managed server-side (`cli.appVersionSource: "remote"`) and the production
+profile sets `autoIncrement: true`, so every production build gets a unique,
+monotonic build number with no manual bumping and no collisions.
+
+Two build paths are automated:
+
+- **Preview build on merge** — [.github/workflows/eas-preview.yml](./.github/workflows/eas-preview.yml)
+  builds the `preview` profile after CI passes on `main`.
+- **Production release on tag** — [.github/workflows/eas-release.yml](./.github/workflows/eas-release.yml)
+  (below).
+
+A one-off preview build can also be run by hand:
 
 ```sh
 npx eas build --platform ios --profile preview
 ```
 
-TestFlight submission and Apple signing are intentionally left for the account owner.
+### Automated App Store submission
+
+Pushing a version tag ships a release:
+
+```sh
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+That triggers [eas-release.yml](./.github/workflows/eas-release.yml), which, in
+strict order:
+
+1. **Re-runs the full quality gate** on the tagged commit (it calls
+   [ci.yml](./.github/workflows/ci.yml) as a reusable workflow). Nothing builds
+   or submits unless this is green.
+2. **Builds** the `production` profile on EAS and **submits that exact build** to
+   App Store Connect / TestFlight with `eas submit --platform ios --non-interactive`.
+   Any failure is a hard, red, notifying failure — never silent.
+3. **Publishes a GitHub Release** for the tag with notes generated from the
+   merged PRs/commits since the previous tag.
+
+#### Do the first submission by hand — this is not optional
+
+**Never let this workflow be the first time the app reaches App Store Connect.**
+Build and submit to TestFlight manually once first:
+
+```sh
+npx eas build --platform ios --profile production
+npx eas submit --platform ios --profile production
+```
+
+Signing, provisioning profiles, capability mismatches, and API-key permissions
+all fail in ways CI logs describe badly and misleadingly. A non-interactive CI
+build also cannot _create_ missing iOS credentials — it can only reuse what the
+manual build already stored on EAS. Do it by hand once, understand each failure
+in the EAS/Xcode output, and only then rely on the tag pipeline.
+
+#### Required GitHub secrets
+
+Set these under **Settings → Secrets and variables → Actions**:
+
+| Secret               | What it is                                                           |
+| -------------------- | -------------------------------------------------------------------- |
+| `EXPO_TOKEN`         | Expo personal access token (**Account → Settings → Access tokens**). |
+| `ASC_API_KEY_BASE64` | The App Store Connect API key `.p8`, base64-encoded (see below).     |
+| `ASC_KEY_ID`         | The API key's **Key ID**.                                            |
+| `ASC_ISSUER_ID`      | The API key's **Issuer ID**.                                         |
+
+Create the App Store Connect API key under **App Store Connect → Users and
+Access → Integrations → App Store Connect API** (an **App Manager** role is
+enough to submit). You download the `.p8` **once** — store it safely. Encode it
+for the secret with:
+
+```sh
+base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy   # macOS; paste into ASC_API_KEY_BASE64
+```
+
+The workflow decodes the key into `RUNNER_TEMP` at run time and passes all three
+values to `eas submit` through the `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`,
+and `EXPO_ASC_ISSUER_ID` environment variables. No Apple credentials are ever
+committed — `eas.json` holds none. The app to submit to is resolved from the
+`ios.bundleIdentifier` in [app.json](./app.json); if you ever need to pin it
+explicitly, add a non-secret `ascAppId` to `submit.production.ios` in `eas.json`.
