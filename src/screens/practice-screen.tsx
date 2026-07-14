@@ -12,7 +12,7 @@ import {
 } from '@/components/ui';
 import { colors, fonts, type } from '@/theme';
 
-type PracticeRoute = 'daily' | 'vocabulary' | 'calculations';
+type PracticeRoute = 'daily' | 'vocabulary' | 'calculations' | 'mistakes';
 
 export function PracticeScreen({
   dueCount,
@@ -22,6 +22,7 @@ export function PracticeScreen({
   eligibleSectionCount,
   vocabularyCount,
   calculationCount,
+  mistakeCount,
 }: {
   dueCount: number;
   onOpen: (route: PracticeRoute) => void;
@@ -30,6 +31,7 @@ export function PracticeScreen({
   eligibleSectionCount: number;
   vocabularyCount: number;
   calculationCount: number;
+  mistakeCount: number;
 }) {
   return (
     <Screen
@@ -117,9 +119,14 @@ export function PracticeScreen({
         <DrillCard
           icon="alert-circle-outline"
           name="Mistakes"
-          detail="Misses are being collected for a future review mode"
-          color={colors.muted}
-          disabled
+          detail={
+            mistakeCount
+              ? `${mistakeCount} unresolved miss${mistakeCount === 1 ? '' : 'es'} ready to retry`
+              : 'Missed answers will appear here for focused retry'
+          }
+          color={colors.magenta}
+          onPress={() => onOpen('mistakes')}
+          disabled={!mistakeCount}
         />
       </View>
 
