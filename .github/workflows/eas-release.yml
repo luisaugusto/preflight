@@ -1,0 +1,236 @@
+name: EAS Release (App Store)
+
+# Tag-triggered production pipeline. Pushing a version tag (e.g. `v1.2.0`) builds
+# the iOS app on EAS and submits it to App Store Connect / TestFlight, gated end
+# to end:
+#
+#   1. quality-gate     Reuses the exact CI quality gate (typecheck, lint, format,
+#                       unit tests, content validation, expo-doctor) against the
+#                       tagged commit. Nothing below runs unless it is green — the
+#                       literal "submission only proceeds if the full quality gate
+#                       passed".
+#   2. build-and-submit Production EAS build, then `eas submit` of that exact
+#                       build to TestFlight. Non-interactive; any failure is a
+#                       hard, red, notifying failure — never silent. Build numbers
+#                       are assigned server-side (appVersionSource: remote +
+#                       autoIncrement), so no manual bumping and no collisions.
+#   3. github-release   Publishes a GitHub Release for the tag with notes
+#                       generated from the merged PRs/commits since the last tag.
+#
+# PREREQUISITE — do the first submission by hand. This must NOT be the first time
+# the app reaches App Store Connect. Build and submit to TestFlight manually once
+# first, so iOS signing, provisioning profiles, capabilities, and the ASC app
+# record all exist and are known-good; a non-interactive CI build cannot create
+# missing credentials and will fail. See README → "Automated App Store submission".
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   EXPO_TOKEN          Expo personal access token (authenticates eas-cli).
+#   ASC_API_KEY_BASE64  The App Store Connect API key .p8, base64-encoded.
+#   ASC_KEY_ID          The ASC API key's Key ID.
+#   ASC_ISSUER_ID       The ASC API key's Issuer ID.
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Default the pipeline to read-only; only the github-release job opts up to
+# contents: write (to create the Release).
+permissions:
+  contents: read
+
+# One release pipeline per tag. Never cancel a run already in flight — a
+# half-cancelled App Store upload is exactly the kind of silent mess this avoids.
+concurrency:
+  group: eas-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Gate everything on the same checks that guard pull requests and main. Tags
+  # don't match ci.yml's push/pull_request triggers, so we invoke it as a
+  # reusable workflow here; it checks out and validates the tagged commit.
+  quality-gate:
+    name: Quality gate
+    uses: ./.github/workflows/ci.yml
+
+  build-and-submit:
+    name: Build & submit to TestFlight
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    # Bound the wait so a stuck build/submit can't hold a runner all day.
+    timeout-minutes: 60
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      # eas-cli resolves this project's Expo app config (its config plugins) and
+      # metro.config.js locally before handing the build to EAS, and both read
+      # node_modules. Without a clean install the build fails with
+      # MODULE_NOT_FOUND before it is even queued — same `npm ci` the gate runs.
+      - name: Install dependencies
+        run: npm ci
+
+      # Production build, waiting for the result (deliberately no --no-wait): we
+      # need the finished build's id to submit exactly that build, and we need a
+      # hard failure if it doesn't reach FINISHED. --json makes the CLI emit the
+      # final build object we parse; a non-zero exit — or a non-FINISHED status —
+      # fails the job before we ever submit. Build first, while eas.json is still
+      # the pristine committed file (the build uploads the project); the submit
+      # credentials are injected only afterwards, below.
+      - name: Build production app on EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --json \
+            > eas-build.json
+          build_id="$(jq -r 'if type == "array" then .[0] else . end | .id' eas-build.json)"
+          status="$(jq -r 'if type == "array" then .[0] else . end | .status' eas-build.json)"
+          echo "EAS build ${build_id} finished with status: ${status}"
+          case "${status}" in
+            FINISHED | finished) ;;
+            *)
+              echo "::error::EAS production build did not finish (status: ${status}). Not submitting."
+              cat eas-build.json
+              exit 1
+              ;;
+          esac
+          echo "EAS_BUILD_ID=${build_id}" >> "$GITHUB_ENV"
+
+      # `eas submit` reads the iOS App Store Connect API key from the submit
+      # profile in eas.json (its `path` credential source) — it does NOT read
+      # EXPO_ASC_* environment variables (those are for `eas build` credential
+      # repair) — and non-interactive submit additionally requires an explicit
+      # `ascAppId`. So decode the .p8 from its base64 secret and inject the full
+      # credential set into `submit.production.ios` at run time. The committed
+      # eas.json holds none of it; this patched copy exists only on the ephemeral
+      # runner, after the build has uploaded the project, and is never committed.
+      - name: Configure iOS submit credentials
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          # ascAppId is the public App Store app id, not a secret — a repo variable.
+          ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for var in ASC_API_KEY_BASE64 ASC_KEY_ID ASC_ISSUER_ID ASC_APP_ID; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::${var} is not configured. Set the release secrets and the ASC_APP_ID variable before tagging (README → Automated App Store submission)."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+          # Decode the key into a file OUTSIDE the repo tree; base64 is how a
+          # multi-line PEM key fits in one secret. Never print it.
+          key_path="${RUNNER_TEMP}/asc-api-key.p8"
+          printf '%s' "$ASC_API_KEY_BASE64" | base64 -d > "$key_path"
+          if [ ! -s "$key_path" ]; then
+            echo "::error::Decoded ASC API key is empty — check the base64 in ASC_API_KEY_BASE64."
+            exit 1
+          fi
+
+          # Inject the credential set into the production submit profile. Do not
+          # print the result: it carries the key id, issuer id, and key path.
+          tmp="$(mktemp)"
+          jq \
+            --arg path "$key_path" \
+            --arg keyId "$ASC_KEY_ID" \
+            --arg issuerId "$ASC_ISSUER_ID" \
+            --arg appId "$ASC_APP_ID" \
+            '.submit.production.ios = {
+               ascApiKeyPath: $path,
+               ascApiKeyId: $keyId,
+               ascApiKeyIssuerId: $issuerId,
+               ascAppId: $appId
+             }' \
+            eas.json > "$tmp"
+          mv "$tmp" eas.json
+          echo "Injected iOS submit credentials into submit.production.ios."
+
+      # Submit that exact build to App Store Connect / TestFlight, reading the ASC
+      # API key and ascAppId from the profile injected above. eas submit waits for
+      # the upload and exits non-zero on any failure, so a broken submission turns
+      # the job red (and fires GitHub's failed-run notification), never silent.
+      - name: Submit to App Store Connect / TestFlight
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx eas-cli@latest submit \
+            --platform ios \
+            --profile production \
+            --id "${EAS_BUILD_ID}" \
+            --non-interactive
+
+      - name: Summarise the release
+        if: success()
+        run: |
+          {
+            echo "### ✅ Submitted to TestFlight"
+            echo ""
+            echo "- **Tag:** \`${GITHUB_REF_NAME}\`"
+            echo "- **EAS build:** \`${EAS_BUILD_ID}\`"
+            echo "- **Platform:** iOS (production profile)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Loud, not silent: on any failure above, paint a red banner on the run
+      # summary. The job itself also ends failed, so GitHub sends its standard
+      # failed-run notification to the tagger.
+      - name: Report failure
+        if: failure()
+        run: |
+          {
+            echo "### ❌ Release pipeline failed for \`${GITHUB_REF_NAME}\`"
+            echo ""
+            echo "The tagged build or App Store submission did not complete, so nothing"
+            echo "was released. Open the failed step above for the EAS/App Store log."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  github-release:
+    name: Publish GitHub Release
+    needs: build-and-submit
+    runs-on: ubuntu-latest
+    # Only this job needs to write — it creates the Release.
+    permissions:
+      contents: write
+    steps:
+      # Create the Release for this tag with auto-generated notes: GitHub builds
+      # them from the merged PRs/commits since the previous tag — the "release
+      # notes generated from the tag/changelog". Our TestFlight line is prepended
+      # to those generated notes. Runs only after a successful submission, so a
+      # red pipeline never produces a Release.
+      - name: Create GitHub Release with generated notes
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const body = `📲 **Submitted to TestFlight** via EAS from \`${tag}\`.\n`;
+            try {
+              const res = await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: tag,
+                name: tag,
+                body,
+                generate_release_notes: true,
+              });
+              core.info(`Created release: ${res.data.html_url}`);
+            } catch (error) {
+              if (error.status === 422) {
+                core.info('A release already exists for this tag; leaving it untouched.');
+              } else {
+                throw error;
+              }
+            }
