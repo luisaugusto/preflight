@@ -28,10 +28,13 @@ npm run content:build
 npm run content:validate
 ```
 
-Downloads and extracted text stay under ignored `tmp/pdfs/`. The build verifies
-the pinned checksums and page counts, generates the four-module catalog and TOC
-coverage report, renders one cited offline figure per section, and emits Metro's
-literal asset registry.
+Downloads and reading-order text extracts stay under ignored `tmp/pdfs/`. The
+build verifies the pinned checksums and page counts, generates the four-module
+catalog and TOC coverage report, renders one cited offline figure per section,
+records each figure's PDF checksum/page so unchanged images are not re-encoded,
+and emits Metro's literal asset registry. Generated lesson checks use statements
+from each lesson's cited page, related handbook concepts as distractors, and
+deterministically varied answer positions.
 
 ## Validation guarantees
 
@@ -42,3 +45,8 @@ literal asset registry.
 - Human printed-page labels plus one-based physical PDF page locators.
 - Pinned FAA-S-ACS-6C vocabulary, valid answers, and existing offline assets.
 - A coverage entry for every section, lesson, and handbook appendix disposition.
+- Unique normalized prompts and at least 90% distinct option and distractor sets.
+- No generic fallback stems, topic-identification answers, or distractors in generated questions.
+- Source-text overlap for lesson checks, section quizzes, and module exams.
+- Source-detail list, cloze, and fact checks with distributed correct-answer positions and bounded question-stem reuse.
+- Unique numeric exam values and rejection of extracted figure/chapter-header artifacts.

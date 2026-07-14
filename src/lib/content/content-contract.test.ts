@@ -47,4 +47,58 @@ describe('checked-in FAA curriculum catalog', () => {
       });
     });
   });
+
+  it('keeps generated lesson questions diverse and tied to lesson text', () => {
+    const catalog = normalizeCurriculum(catalogJson);
+    const generatedModules = catalog.modules.filter((module) => module.id !== 'phak');
+    const genericFragments = [
+      'what is the sound operational use of',
+      'delay action until the remaining safety margin is nearly gone',
+      'rely on memory and disregard the published limitation or procedure',
+    ];
+    const words = (value: string) =>
+      new Set(
+        value
+          .toLowerCase()
+          .match(/[a-z0-9]+/g)
+          ?.filter((word) => word.length >= 4) ?? [],
+      );
+
+    generatedModules.forEach((module) => {
+      const lessons = module.sections.flatMap((section) => section.lessons);
+      const prompts = lessons.map((lesson) => lesson.practice.prompt.toLowerCase());
+      expect(new Set(prompts).size).toBe(prompts.length);
+
+      const choiceQuestions = lessons
+        .map((lesson) => lesson.practice)
+        .filter((question) => question.type === 'multipleChoice');
+      const distractorSets = choiceQuestions.map((question) =>
+        question.options
+          .filter((_, index) => index !== question.correctIndex)
+          .map((option) => option.toLowerCase())
+          .sort()
+          .join('|'),
+      );
+      expect(new Set(distractorSets).size).toBeGreaterThanOrEqual(
+        Math.floor(choiceQuestions.length * 0.9),
+      );
+      expect(new Set(choiceQuestions.map((question) => question.correctIndex))).toEqual(
+        new Set([0, 1, 2, 3]),
+      );
+
+      lessons.forEach((lesson) => {
+        const question = lesson.practice;
+        expect(
+          genericFragments.some((fragment) => JSON.stringify(question).includes(fragment)),
+        ).toBe(false);
+        const correct =
+          question.type === 'multipleChoice' ? question.options[question.correctIndex] : '';
+        expect(correct.toLowerCase()).not.toBe(lesson.title.toLowerCase());
+        const evidenceWords = words(`${question.prompt} ${correct}`);
+        const lessonWords = words(`${lesson.title} ${lesson.concept} ${lesson.explanation}`);
+        const overlap = [...evidenceWords].filter((word) => lessonWords.has(word));
+        expect(overlap.length).toBeGreaterThanOrEqual(4);
+      });
+    });
+  });
 });
