@@ -18,13 +18,15 @@ on:
     # load spike on GitHub's shared cron scheduler.
     - cron: '17 6 * * 1'
   pull_request:
-    # Only docs and the files that carry FAA source URLs are worth re-checking
-    # on a PR; unrelated code changes should not pay for a network link scan.
+    # Only docs and the content pipeline (where FAA source URLs live) are worth
+    # re-checking on a PR; unrelated code changes should not pay for a network
+    # link scan. Whole directories, not named files, so a content refactor or
+    # rename can't quietly drop a source from coverage.
     paths:
       - '**/*.md'
-      - 'scripts/content/phak_config.py'
-      - 'src/content/phak.json'
-      - 'studio/scripts/seed-phak.ts'
+      - 'scripts/content/**'
+      - 'src/content/**'
+      - 'studio/scripts/**'
       - 'lychee.toml'
       - '.github/workflows/link-check.yml'
   workflow_dispatch:
@@ -51,10 +53,13 @@ jobs:
 
       # lychee reads its settings (30s timeout and retries for a slow faa.gov, a
       # browser user-agent, and the example.com/.invalid placeholder excludes)
-      # from ./lychee.toml. The .md glob plus the three non-markdown files below
-      # cover every doc and every place an FAA source URL is configured; lychee
-      # extracts URLs from the .py/.json/.ts files as plaintext and
-      # de-duplicates (267 references collapse to ~14 unique requests).
+      # from ./lychee.toml. The .md glob covers every doc; the content-pipeline
+      # globs cover every place an FAA source URL is configured across all four
+      # handbooks and the ACS (pinned config, seed scripts, and built bundles).
+      # Directory globs — not named files — keep the job resilient when content
+      # files are renamed (e.g. seed-phak.ts -> seed-catalog.ts). lychee reads
+      # the .py/.json/.ts files as plaintext and de-duplicates, so thousands of
+      # references collapse to a handful of unique requests.
       - name: Check links
         id: lychee
         uses: lycheeverse/lychee-action@v2
@@ -63,9 +68,10 @@ jobs:
             --config ./lychee.toml
             --no-progress
             '**/*.md'
-            scripts/content/phak_config.py
-            src/content/phak.json
-            studio/scripts/seed-phak.ts
+            'scripts/content/*.py'
+            'scripts/content/*.json'
+            'src/content/*.json'
+            'studio/scripts/*.ts'
           # PRs: fail so a broken link blocks the docs change under review.
           # Schedule/dispatch: don't fail — the issue steps below react instead.
           fail: ${{ github.event_name == 'pull_request' }}
