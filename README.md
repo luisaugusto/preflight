@@ -157,9 +157,9 @@ build also cannot _create_ missing iOS credentials — it can only reuse what th
 manual build already stored on EAS. Do it by hand once, understand each failure
 in the EAS/Xcode output, and only then rely on the tag pipeline.
 
-#### Required GitHub secrets
+#### Required secrets and variables
 
-Set these under **Settings → Secrets and variables → Actions**:
+Under **Settings → Secrets and variables → Actions**, add four **secrets**:
 
 | Secret               | What it is                                                           |
 | -------------------- | -------------------------------------------------------------------- |
@@ -167,6 +167,12 @@ Set these under **Settings → Secrets and variables → Actions**:
 | `ASC_API_KEY_BASE64` | The App Store Connect API key `.p8`, base64-encoded (see below).     |
 | `ASC_KEY_ID`         | The API key's **Key ID**.                                            |
 | `ASC_ISSUER_ID`      | The API key's **Issuer ID**.                                         |
+
+…and one **variable** (the **Variables** tab, not Secrets — it isn't sensitive):
+
+| Variable     | What it is                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| `ASC_APP_ID` | The app's numeric App Store Connect app id (**App Store Connect → App → App Information → Apple ID**). |
 
 Create the App Store Connect API key under **App Store Connect → Users and
 Access → Integrations → App Store Connect API** (an **App Manager** role is
@@ -177,9 +183,10 @@ for the secret with:
 base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy   # macOS; paste into ASC_API_KEY_BASE64
 ```
 
-The workflow decodes the key into `RUNNER_TEMP` at run time and passes all three
-values to `eas submit` through the `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`,
-and `EXPO_ASC_ISSUER_ID` environment variables. No Apple credentials are ever
-committed — `eas.json` holds none. The app to submit to is resolved from the
-`ios.bundleIdentifier` in [app.json](./app.json); if you ever need to pin it
-explicitly, add a non-secret `ascAppId` to `submit.production.ios` in `eas.json`.
+At run time the workflow decodes the key into `RUNNER_TEMP` and injects the key
+path, Key ID, Issuer ID, and `ascAppId` into the `submit.production.ios` profile
+of a throwaway copy of `eas.json` — that is where `eas submit` reads iOS
+credentials from (it does **not** read them from environment variables, and a
+non-interactive submit requires an explicit `ascAppId`). No Apple credentials
+are ever committed; the committed `eas.json` holds none, and the injected copy
+lives only on the ephemeral runner.
