@@ -43,6 +43,7 @@ export function LessonScreen({
   const [stage, setStage] = useState(initialStage);
   const [maxStageReached, setMaxStageReached] = useState(initialStage);
   const [practiceCorrect, setPracticeCorrect] = useState(false);
+  const [hasAnsweredPractice, setHasAnsweredPractice] = useState(false);
   const totalStages = 4;
   const moveToStage = (nextStage: number) => {
     const clampedStage = Math.min(totalStages - 1, Math.max(0, nextStage));
@@ -148,6 +149,7 @@ export function LessonScreen({
           continueLabel="STAMP THIS LESSON"
           onComplete={(correct) => {
             setPracticeCorrect(correct);
+            setHasAnsweredPractice(true);
             moveToStage(3);
           }}
         />
@@ -180,7 +182,13 @@ export function LessonScreen({
           <PrimaryButton
             label="NEXT LEG"
             icon="arrow-right"
-            onPress={() => onComplete(practiceCorrect)}
+            onPress={() => {
+              if (isLessonComplete && !hasAnsweredPractice) {
+                onNavigateLesson?.('next');
+                return;
+              }
+              onComplete(practiceCorrect);
+            }}
           />
         </View>
       ) : null}

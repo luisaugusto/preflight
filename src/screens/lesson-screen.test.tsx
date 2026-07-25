@@ -76,4 +76,28 @@ describe('LessonScreen section navigation', () => {
     expect(screen.getByText('YOUR TURN')).toBeTruthy();
     expect(onNavigateLesson).toHaveBeenCalledTimes(1);
   });
+
+  it('does not report a fabricated result when reviewing a completed lesson opened at the final screen', async () => {
+    const onNavigateLesson = jest.fn();
+    const onComplete = jest.fn();
+    const screen = await render(
+      <LessonScreen
+        section={section}
+        lesson={section.lessons[1]}
+        lessonIndex={1}
+        initialStage={3}
+        isLessonComplete
+        canNavigateToPreviousLesson
+        canNavigateToNextLesson
+        onExit={jest.fn()}
+        onNavigateLesson={onNavigateLesson}
+        onComplete={onComplete}
+      />,
+    );
+
+    await fireEvent.press(screen.getByText('NEXT LEG'));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onNavigateLesson).toHaveBeenCalledWith('next');
+  });
 });

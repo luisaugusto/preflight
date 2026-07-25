@@ -57,6 +57,42 @@ type AppRoute =
 const bundledCurriculum = catalogContent as CurriculumBundle;
 const firstBundledModule = bundledCurriculum.modules[0];
 
+function lessonOrderIndex(section: Section, lessonId: string | null): number {
+  if (!lessonId) return -1;
+  return section.lessons.findIndex((lesson) => lesson.id === lessonId);
+}
+
+export function isForwardResumeProgress(
+  resume: ResumePosition | null,
+  moduleId: string,
+  section: Section,
+  lessonId: string,
+  stage: number,
+): boolean {
+  if (!resume || resume.moduleId !== moduleId || resume.sectionId !== section.id) return true;
+  const currentIndex = lessonOrderIndex(section, resume.lessonId);
+  const targetIndex = lessonOrderIndex(section, lessonId);
+  if (currentIndex < 0 || targetIndex < 0) return true;
+  if (targetIndex !== currentIndex) return targetIndex > currentIndex;
+  return stage >= resume.blockIndex;
+}
+
+export function isLessonReached(
+  resume: ResumePosition | null,
+  moduleId: string,
+  section: Section,
+  lessonId: string,
+  completedLessonIds: ReadonlySet<string>,
+): boolean {
+  if (completedLessonIds.has(lessonId)) return true;
+  return Boolean(
+    resume &&
+      resume.moduleId === moduleId &&
+      resume.sectionId === section.id &&
+      resume.lessonId === lessonId,
+  );
+}
+
 function reconcileCompletedSections(
   curriculum: CurriculumBundle,
   completedLessonIds: ReadonlySet<string>,
@@ -317,9 +353,23 @@ export function PreflightApp() {
     const nextIndex = direction === 'previous' ? lessonIndex - 1 : lessonIndex + 1;
     const targetLesson = activeSection.lessons[nextIndex];
     if (!targetLesson) return;
-    const targetStage = completedLessonIds.has(targetLesson.id) ? 3 : 0;
+    const targetStage = completedLessonIds.has(targetLesson.id)
+      ? 3
+      : resumePosition?.moduleId === moduleContent.id &&
+          resumePosition.sectionId === activeSection.id &&
+          resumePosition.lessonId === targetLesson.id
+        ? resumePosition.blockIndex
+        : 0;
     setLessonIndex(nextIndex);
     setLessonStage(targetStage);
+    const isForwardProgress = isForwardResumeProgress(
+      resumePosition,
+      moduleContent.id,
+      activeSection,
+      targetLesson.id,
+      targetStage,
+    );
+    if (!isForwardProgress) return;
     const nextResume: ResumePosition = {
       moduleId: moduleContent.id,
       sectionId: activeSection.id,
@@ -478,13 +528,27 @@ export function PreflightApp() {
         canNavigateToPreviousLesson={lessonIndex > 0}
         canNavigateToNextLesson={
           lessonIndex < activeSection.lessons.length - 1 &&
-          completedLessonIds.has(activeSection.lessons[lessonIndex + 1].id)
+          isLessonReached(
+            resumePosition,
+            moduleContent.id,
+            activeSection,
+            activeSection.lessons[lessonIndex + 1].id,
+            completedLessonIds,
+          )
         }
         onNavigateLesson={navigateLessonScreen}
         onExit={() => setRoute('home')}
         onStageChange={(stage) => {
           const lesson = activeSection.lessons[lessonIndex];
           setLessonStage(stage);
+          const isForwardProgress = isForwardResumeProgress(
+            resumePosition,
+            moduleContent.id,
+            activeSection,
+            lesson.id,
+            stage,
+          );
+          if (!isForwardProgress) return;
           const nextResume: ResumePosition = {
             moduleId: moduleContent.id,
             sectionId: activeSection.id,
