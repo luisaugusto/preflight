@@ -196,6 +196,8 @@ export interface RecordAttemptInput {
   maxScore?: number;
   attemptedAt?: string | Date;
   contentVersion: string;
+  /** Set to false for ephemeral questions (e.g. date-seeded calculations) whose id can't be resolved later. */
+  trackMistake?: boolean;
 }
 
 export interface AttemptQuery {
@@ -518,33 +520,35 @@ export class PreflightRepository {
         ],
       );
 
-      if (input.isCorrect) {
-        await this.db.runAsync(
-          'UPDATE mistakes SET resolved_at = ?, last_attempt_at = ? WHERE question_id = ?',
-          [attemptedAt, attemptedAt, input.questionId],
-        );
-      } else {
-        await this.db.runAsync(
-          `INSERT INTO mistakes
-            (question_id, section_id, module_id, occurrence_count, last_response_json, last_attempt_at, resolved_at, content_version)
-           VALUES (?, ?, ?, 1, ?, ?, NULL, ?)
-           ON CONFLICT(question_id) DO UPDATE SET
-            section_id = excluded.section_id,
-            module_id = excluded.module_id,
-            occurrence_count = mistakes.occurrence_count + 1,
-            last_response_json = excluded.last_response_json,
-            last_attempt_at = excluded.last_attempt_at,
-            resolved_at = NULL,
-            content_version = excluded.content_version`,
-          [
-            input.questionId,
-            input.sectionId ?? null,
-            input.moduleId,
-            responseJson,
-            attemptedAt,
-            input.contentVersion,
-          ],
-        );
+      if (input.trackMistake ?? true) {
+        if (input.isCorrect) {
+          await this.db.runAsync(
+            'UPDATE mistakes SET resolved_at = ?, last_attempt_at = ? WHERE question_id = ?',
+            [attemptedAt, attemptedAt, input.questionId],
+          );
+        } else {
+          await this.db.runAsync(
+            `INSERT INTO mistakes
+              (question_id, section_id, module_id, occurrence_count, last_response_json, last_attempt_at, resolved_at, content_version)
+             VALUES (?, ?, ?, 1, ?, ?, NULL, ?)
+             ON CONFLICT(question_id) DO UPDATE SET
+              section_id = excluded.section_id,
+              module_id = excluded.module_id,
+              occurrence_count = mistakes.occurrence_count + 1,
+              last_response_json = excluded.last_response_json,
+              last_attempt_at = excluded.last_attempt_at,
+              resolved_at = NULL,
+              content_version = excluded.content_version`,
+            [
+              input.questionId,
+              input.sectionId ?? null,
+              input.moduleId,
+              responseJson,
+              attemptedAt,
+              input.contentVersion,
+            ],
+          );
+        }
       }
     });
 

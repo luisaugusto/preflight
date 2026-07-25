@@ -97,6 +97,7 @@ export function PreflightApp() {
   const [resumePosition, setResumePosition] = useState<ResumePosition | null>(null);
   const [dueQuestionIds, setDueQuestionIds] = useState<string[]>([]);
   const [dailySessionQuestions, setDailySessionQuestions] = useState<Question[]>([]);
+  const [mistakeSessionQuestions, setMistakeSessionQuestions] = useState<Question[]>([]);
   const [mistakeQuestionIds, setMistakeQuestionIds] = useState<string[]>([]);
   const [vocabularyOffset, setVocabularyOffset] = useState(0);
   const repository = useRef<PreflightRepository | null>(null);
@@ -398,6 +399,7 @@ export function PreflightApp() {
     correct: boolean,
     sectionId?: string,
     scheduleForReview = true,
+    trackMistake = true,
   ) => {
     analytics.track('question_answered', { questionId: question.id, type: question.type, correct });
     const repo = repository.current;
@@ -413,7 +415,12 @@ export function PreflightApp() {
         contentVersion:
           curriculum.modules.find((module) => module.id === question.moduleId)?.version ??
           moduleContent.version,
+        trackMistake,
       });
+      if (trackMistake) {
+        const mistakes = await repo.listMistakes();
+        setMistakeQuestionIds(mistakes.map((mistake) => mistake.questionId));
+      }
       if (!scheduleForReview) return;
       const existing = await repo.getReviewCard(question.id, 'question');
       const current = existing ?? createReviewCard(question.id, 'question');
@@ -423,8 +430,6 @@ export function PreflightApp() {
       setDueQuestionIds(
         due.filter((card) => card.contentType === 'question').map((card) => card.contentId),
       );
-      const mistakes = await repo.listMistakes();
-      setMistakeQuestionIds(mistakes.map((mistake) => mistake.questionId));
     })().catch(() => {
       // A local persistence failure must not interrupt the learning flow.
     });
@@ -583,6 +588,7 @@ export function PreflightApp() {
         mistakeCount={mistakeQuestions.length}
         onOpen={(nextRoute) => {
           if (nextRoute === 'daily') setDailySessionQuestions(dailyQuestions);
+          if (nextRoute === 'mistakes') setMistakeSessionQuestions(mistakeQuestions);
           setRoute(nextRoute);
         }}
         onPath={() => setRoute('home')}
@@ -639,7 +645,7 @@ export function PreflightApp() {
         onExit={() => setRoute('practice')}
         onFinish={() => setRoute('practice')}
         onQuestionAnswered={(question, correct) =>
-          recordQuestionResult(question, correct, undefined, false)
+          recordQuestionResult(question, correct, undefined, false, false)
         }
       />
     );
@@ -650,10 +656,13 @@ export function PreflightApp() {
       <QuizScreen
         title="Mistake review"
         label="PRACTICE / MISTAKES"
-        questions={mistakeQuestions}
+        questions={mistakeSessionQuestions.length ? mistakeSessionQuestions : mistakeQuestions}
         passThreshold={0}
         onExit={() => setRoute('practice')}
-        onFinish={() => setRoute('practice')}
+        onFinish={() => {
+          setMistakeSessionQuestions([]);
+          setRoute('practice');
+        }}
         onQuestionAnswered={(question, correct) => recordQuestionResult(question, correct)}
       />
     );
