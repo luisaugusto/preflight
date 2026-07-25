@@ -17,7 +17,7 @@ For browser-based UI checks:
 npm run web -- --port 4173
 ```
 
-The app uses Expo Router and ships its initial content and figures in the binary. On launch it can atomically activate the checksum-verified, versioned bundle hosted in Sanity, while retaining the bundled or last-known-good version if sync fails. Learning state stays on-device in Expo SQLite. No account, server, payment system, analytics vendor, or runtime AI API is used.
+The app uses Expo Router and ships its initial content and figures in the binary. On launch it can atomically activate the checksum-verified, versioned bundle hosted in Sanity, while retaining the bundled or last-known-good version if sync fails. Learning state stays on-device in Expo SQLite. No account, payment system, analytics vendor, or runtime AI API is used; the only server endpoint accepts anonymous content reports and stores them in Sanity.
 
 ## Validate
 
@@ -97,6 +97,22 @@ SANITY_AUTH_TOKEN=... npm run seed:catalog -- --publish
 
 Never expose that token through an `EXPO_PUBLIC_` variable or bundle it into the app. The idempotent import creates or replaces 1,745 published curriculum documents, uploads 89 figures, and uploads the checksum-verified catalog and manifest to Sanity's CDN. Omitting `--publish` writes review drafts instead.
 
+### In-app content reports
+
+Lesson and question reports are submitted to the Expo Router
+`/api/content-reports` route and stored as `contentReport` drafts in the same
+dataset. Drafts keep anonymous learner text out of the public Content Lake API.
+The Studio intentionally removes Publish and Unpublish actions for this type;
+never publish a report, because a published document in this dataset is public.
+
+The route resolves the app's stable content ID to the corresponding lesson or
+question, then creates a weak reference so editors can navigate directly to the
+reported content. Reports appear in Studio under **Content reports**, grouped as
+New, In progress, Resolved, or Won't fix.
+
+For local development, copy `.env.example` to `.env.local` and supply an Editor
+token as `SANITY_AUTH_TOKEN`. The token is used only by the server route.
+
 Validate every live document and its references with:
 
 ```sh
@@ -110,6 +126,29 @@ npx sanity documents validate --workspace preflight --yes --level warning
 are managed server-side (`cli.appVersionSource: "remote"`) and the production
 profile sets `autoIncrement: true`, so every production build gets a unique,
 monotonic build number with no manual bumping and no collisions.
+
+Expo Router API routes are deployed with the native app server. In the EAS
+project's `preview` and `production` environments, configure:
+
+| Variable                      | Visibility | Value                                 |
+| ----------------------------- | ---------- | ------------------------------------- |
+| `EXPO_UNSTABLE_DEPLOY_SERVER` | Plain text | `1`                                   |
+| `SANITY_PROJECT_ID`           | Plain text | `4qoowg94`                            |
+| `SANITY_DATASET`              | Plain text | `production`                          |
+| `SANITY_AUTH_TOKEN`           | Sensitive  | A dedicated Sanity Editor robot token |
+
+Do not use EAS `Secret` visibility for `SANITY_AUTH_TOKEN`: EAS Hosting deploys
+server variables from the selected environment and currently supports plain
+text and sensitive variables. After configuring them, initialize Hosting once:
+
+```sh
+npx expo export --platform web
+npx eas-cli@latest deploy --environment production
+```
+
+Subsequent preview and production EAS builds use
+`EXPO_UNSTABLE_DEPLOY_SERVER=1` to deploy and link the matching versioned server
+automatically.
 
 Two build paths are automated:
 

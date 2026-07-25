@@ -1,6 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import * as Linking from 'expo-linking';
-import { useState } from 'react';
+import Constants from 'expo-constants';
+import { randomUUID } from 'expo-crypto';
+import { useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -16,9 +17,12 @@ import {
 } from 'react-native';
 import { Card, PrimaryButton } from '@/components/ui';
 import type { Lesson, Question } from '@/lib/content/types';
+import {
+  CONTENT_REPORT_DETAILS_MAX_LENGTH,
+  CONTENT_REPORT_SNAPSHOT_MAX_LENGTH,
+  type ContentReportPayload,
+} from '@/lib/content-report-contract';
 import { colors, fonts, type } from '@/theme';
-
-export const CONTENT_REPORT_EMAIL = 'hello@luis.app';
 
 type ContentReportProps =
   | {
@@ -34,36 +38,59 @@ type ContentReportProps =
 export function ContentReport(props: ContentReportProps) {
   const [open, setOpen] = useState(false);
   const [details, setDetails] = useState('');
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submissionId = useRef<string | null>(null);
   const report = getReportContext(props);
 
   const close = () => {
     Keyboard.dismiss();
     setOpen(false);
     setDetails('');
+    setDetailsError(null);
+    submissionId.current = null;
   };
 
-  const sendReport = () => {
-    Keyboard.dismiss();
-    const body = [
-      'I found a content issue while studying:',
-      '',
-      details.trim() || '[Describe what looks wrong or confusing here.]',
-      '',
-      `--- ${report.displayName} context ---`,
-      ...report.context,
-    ].join('\n');
-    const url = `mailto:${CONTENT_REPORT_EMAIL}?subject=${encodeURIComponent(
-      `Preflight content report: ${report.id}`,
-    )}&body=${encodeURIComponent(body)}`;
+  const submitReport = async () => {
+    const trimmedDetails = details.trim();
+    if (!trimmedDetails) {
+      setDetailsError('Tell us what looks wrong or confusing.');
+      return;
+    }
 
-    void Linking.openURL(url)
-      .then(() => close())
-      .catch(() => {
-        Alert.alert(
-          'Unable to open email',
-          `Please send your note to ${CONTENT_REPORT_EMAIL} and include ${report.name} ${report.id}.`,
-        );
+    Keyboard.dismiss();
+    setSubmitting(true);
+
+    const payload: ContentReportPayload = {
+      submissionId: (submissionId.current ??= randomUUID()),
+      contentType: props.contentType,
+      contentId: report.id,
+      contentPart: report.contentPart,
+      details: trimmedDetails,
+      contentSnapshot: report.contentSnapshot.slice(0, CONTENT_REPORT_SNAPSHOT_MAX_LENGTH),
+      sourceLabel: report.sourceLabel,
+      appVersion: Constants.expoConfig?.version ?? 'unknown',
+      platform: getReportPlatform(),
+    };
+
+    try {
+      const response = await fetch('/api/content-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
+      if (!response.ok) throw new Error(`Report endpoint returned ${response.status}.`);
+
+      close();
+      Alert.alert('Report submitted', 'Thanks — your report is ready for review.');
+    } catch {
+      Alert.alert(
+        'Unable to submit report',
+        'Check your connection and try again. Your report details are still here.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -77,7 +104,14 @@ export function ContentReport(props: ContentReportProps) {
         <MaterialCommunityIcons name="flag-outline" size={16} color={colors.magenta} />
         <Text style={styles.reportButtonText}>REPORT CONTENT ISSUE</Text>
       </Pressable>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!submitting) close();
+        }}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.reportKeyboardAvoider}
@@ -96,8 +130,10 @@ export function ContentReport(props: ContentReportProps) {
                 </View>
                 <Pressable
                   onPress={close}
+                  disabled={submitting}
                   accessibilityRole="button"
                   accessibilityLabel="Close report form"
+                  accessibilityState={{ disabled: submitting }}
                   hitSlop={12}
                 >
                   <MaterialCommunityIcons name="close" size={23} color={colors.ink} />
@@ -109,8 +145,12 @@ export function ContentReport(props: ContentReportProps) {
               </Text>
               <TextInput
                 value={details}
-                onChangeText={setDetails}
+                onChangeText={(value) => {
+                  setDetails(value);
+                  if (detailsError) setDetailsError(null);
+                }}
                 multiline
+                maxLength={CONTENT_REPORT_DETAILS_MAX_LENGTH}
                 enterKeyHint="done"
                 submitBehavior="blurAndSubmit"
                 onSubmitEditing={Keyboard.dismiss}
@@ -120,6 +160,11 @@ export function ContentReport(props: ContentReportProps) {
                 style={styles.reportInput}
                 textAlignVertical="top"
               />
+              {detailsError ? (
+                <Text accessibilityRole="alert" style={styles.reportError}>
+                  {detailsError}
+                </Text>
+              ) : null}
               <Pressable
                 onPress={Keyboard.dismiss}
                 accessibilityRole="button"
@@ -138,7 +183,12 @@ export function ContentReport(props: ContentReportProps) {
                 </Text>
                 <Text style={styles.reportMetaText}>{report.sourceLabel}</Text>
               </View>
-              <PrimaryButton label="SEND REPORT" icon="email-outline" onPress={sendReport} />
+              <PrimaryButton
+                label="SUBMIT REPORT"
+                icon="send-outline"
+                loading={submitting}
+                onPress={() => void submitReport()}
+              />
             </Card>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -156,13 +206,15 @@ function getReportContext(props: ContentReportProps) {
       name: 'question',
       displayName: 'Question',
       sourceLabel,
-      context: [
+      contentPart: 'question' as const,
+      contentSnapshot: [
         `Question ID: ${content.id}`,
         `Type: ${content.type}`,
         `Prompt: ${content.prompt}`,
+        `Explanation: ${content.explanation}`,
         sourceContext(content),
         acsContext(content),
-      ],
+      ].join('\n'),
     };
   }
 
@@ -181,15 +233,22 @@ function getReportContext(props: ContentReportProps) {
     name: 'lesson',
     displayName: 'Lesson',
     sourceLabel,
-    context: [
+    contentPart: props.lessonPart,
+    contentSnapshot: [
       `Lesson ID: ${content.id}`,
       `Title: ${content.title}`,
       `Part: ${part.label}`,
       `Content: ${part.value}`,
       sourceContext(content),
       acsContext(content),
-    ],
+    ].join('\n'),
   };
+}
+
+function getReportPlatform(): ContentReportPayload['platform'] {
+  return Platform.OS === 'ios' || Platform.OS === 'android' || Platform.OS === 'web'
+    ? Platform.OS
+    : 'unknown';
 }
 
 function sourceContext(content: Question | Lesson) {
@@ -241,6 +300,11 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.ink,
     backgroundColor: colors.paper,
+  },
+  reportError: {
+    fontFamily: fonts.strong,
+    fontSize: 12,
+    color: colors.magentaDark,
   },
   dismissKeyboard: {
     alignSelf: 'flex-end',

@@ -1,11 +1,11 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import * as Linking from 'expo-linking';
-import { ContentReport, CONTENT_REPORT_EMAIL } from '@/components/content-report';
+import { Alert } from 'react-native';
+import { ContentReport } from '@/components/content-report';
 import type { Lesson, Section, SourceCitation } from '@/lib/content/types';
 import { LessonScreen } from '@/screens/lesson-screen';
 
-jest.mock('expo-linking', () => ({
-  openURL: jest.fn(() => Promise.resolve(true)),
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => '2fb1f5c0-2acc-4b88-a1a9-44ed3d4e4651',
 }));
 
 jest.mock('@/components/question-interaction', () => ({
@@ -54,11 +54,21 @@ const section: Section = {
 };
 
 describe('ContentReport', () => {
+  const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
+  let alertSpy: jest.SpyInstance;
+
   beforeEach(() => {
-    jest.mocked(Linking.openURL).mockClear();
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response);
+    globalThis.fetch = fetchMock;
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
-  it('sends a lesson report to the content report address with lesson context', async () => {
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  it('submits a lesson report to the in-app endpoint with lesson context', async () => {
     const screen = await render(
       <ContentReport contentType="lesson" content={lesson} lessonPart="workedExample" />,
     );
@@ -70,16 +80,102 @@ describe('ContentReport', () => {
     expect(screen.getByLabelText('Dismiss keyboard')).toBeTruthy();
 
     await fireEvent.changeText(detailsInput, 'The example is unclear.');
-    await fireEvent.press(screen.getByText('SEND REPORT'));
+    await fireEvent.press(screen.getByText('SUBMIT REPORT'));
 
-    await waitFor(() => expect(Linking.openURL).toHaveBeenCalledTimes(1));
-    const url = jest.mocked(Linking.openURL).mock.calls[0][0];
-    const decodedUrl = decodeURIComponent(url);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/content-reports',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const request = fetchMock.mock.calls[0][1];
+    const payload = JSON.parse(String(request?.body));
 
-    expect(decodedUrl).toContain(`mailto:${CONTENT_REPORT_EMAIL}`);
-    expect(decodedUrl).toContain('Preflight content report: lesson-1');
-    expect(decodedUrl).toContain('Part: Worked example');
-    expect(decodedUrl).toContain(lesson.workedExample);
+    expect(payload).toEqual(
+      expect.objectContaining({
+        submissionId: '2fb1f5c0-2acc-4b88-a1a9-44ed3d4e4651',
+        contentType: 'lesson',
+        contentId: 'lesson-1',
+        contentPart: 'workedExample',
+        details: 'The example is unclear.',
+        sourceLabel: 'Pilot Handbook · p. 2-4',
+      }),
+    );
+    expect(payload.contentSnapshot).toContain('Part: Worked example');
+    expect(payload.contentSnapshot).toContain(lesson.workedExample);
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Report submitted',
+        'Thanks — your report is ready for review.',
+      ),
+    );
+  });
+
+  it('submits question context through the same endpoint', async () => {
+    const screen = await render(<ContentReport contentType="question" content={lesson.practice} />);
+
+    await fireEvent.press(screen.getByLabelText('Report a content issue with this question'));
+    await fireEvent.changeText(
+      screen.getByLabelText('Content issue details'),
+      'The answer wording is ambiguous.',
+    );
+    await fireEvent.press(screen.getByText('SUBMIT REPORT'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(payload).toEqual(
+      expect.objectContaining({
+        contentType: 'question',
+        contentId: 'question-1',
+        contentPart: 'question',
+      }),
+    );
+    expect(payload.contentSnapshot).toContain(lesson.practice.prompt);
+    expect(payload.contentSnapshot).toContain(lesson.practice.explanation);
+  });
+
+  it('requires details before submitting', async () => {
+    const screen = await render(
+      <ContentReport contentType="lesson" content={lesson} lessonPart="concept" />,
+    );
+
+    await fireEvent.press(screen.getByLabelText('Report a content issue with this lesson'));
+    await fireEvent.press(screen.getByText('SUBMIT REPORT'));
+
+    expect(screen.getByText('Tell us what looks wrong or confusing.')).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps details available when submission fails', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500 } as Response);
+    const screen = await render(
+      <ContentReport contentType="lesson" content={lesson} lessonPart="concept" />,
+    );
+
+    await fireEvent.press(screen.getByLabelText('Report a content issue with this lesson'));
+    const detailsInput = screen.getByLabelText('Content issue details');
+    await fireEvent.changeText(detailsInput, 'This explanation contradicts the source.');
+    await fireEvent.press(screen.getByText('SUBMIT REPORT'));
+
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Unable to submit report',
+        'Check your connection and try again. Your report details are still here.',
+      ),
+    );
+    expect(screen.getByLabelText('Content issue details').props.value).toBe(
+      'This explanation contradicts the source.',
+    );
+
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response);
+    await fireEvent.press(screen.getByText('SUBMIT REPORT'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    const firstPayload = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    const retryPayload = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(retryPayload.submissionId).toBe(firstPayload.submissionId);
   });
 
   it('appears on both lesson content stages', async () => {
