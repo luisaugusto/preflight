@@ -50,3 +50,5 @@ deterministically varied answer positions.
 - Source-text overlap for lesson checks, section quizzes, and module exams.
 - Source-detail list, cloze, and fact checks with distributed correct-answer positions and bounded question-stem reuse.
 - Unique numeric exam values and rejection of extracted figure/chapter-header artifacts.
+- Rejection of flowed table and figure-legend text (e.g. risk-matrix rows, mnemonic labels) from lesson concepts, explanations, and generated question text.
+- Matching questions cite a page range covering every paired lesson, not just the first pair, so the displayed citation supports each pairing.

@@ -72,6 +72,27 @@ def clean_extracted_sentence(value: str) -> str:
     return sentence.strip()
 
 
+CONNECTIVE_WORDS = {
+    "the", "and", "of", "to", "a", "in", "is", "for", "that", "with", "as", "on",
+    "by", "an", "be", "or", "at", "this", "are", "it", "which", "when", "not",
+}
+
+
+def is_table_fragment(sentence: str) -> bool:
+    """Detect flowed table or figure-legend text that pdftotext merges into one
+    "sentence" (e.g. a risk-matrix row or a mnemonic legend), so it is never
+    selected as a lesson concept, explanation, or source statement."""
+    if len(re.findall(r'["“][A-Za-z]["”]', sentence)) >= 2:
+        return True
+    if re.search(r"\b(?:Figure|Table)\s+\d+-\d+\.?\s*$", sentence):
+        return True
+    tokens = re.findall(r"[A-Za-z']+", sentence)
+    if len(tokens) < 8:
+        return False
+    connectives = sum(1 for token in tokens if token.lower() in CONNECTIVE_WORDS)
+    return connectives / len(tokens) < 0.1
+
+
 def clean_question_statement(value: str) -> str:
     """Remove extraction-only headers and figure labels from learner-facing text."""
     statement = clean_extracted_sentence(value)
@@ -146,7 +167,7 @@ def excerpt_for(text: str, topic: str, excluded_concepts: set[str] | None = None
     sentences = [
         cleaned
         for sentence in re.split(r"(?<=[.!?])\s+", text)
-        if len(cleaned := clean_extracted_sentence(sentence)) >= 35
+        if len(cleaned := clean_extracted_sentence(sentence)) >= 35 and not is_table_fragment(cleaned)
     ]
     if not sentences:
         concept = f"{topic} requires recognizing the relevant cues, limitations, and pilot actions."
@@ -325,6 +346,7 @@ def source_statement(lesson: dict) -> str:
         if len(normalized_words(sentence)) >= 5
         and not re.search(r":\s*\d+\.?$", sentence)
         and not re.match(r"^(?:figure|table)\s+\d", sentence, re.IGNORECASE)
+        and not is_table_fragment(sentence)
     ]
     if not candidates:
         candidates = all_candidates
@@ -550,6 +572,18 @@ def source_multiple_choice(
     return question
 
 
+def matching_citation(selected: list[dict]) -> dict:
+    """Build a citation that covers every paired lesson's cited page, so the single
+    citation shown with a matching question lets a learner verify every pair rather
+    than only the first lesson selected."""
+    ordered = sorted((lesson["sourceCitation"] for lesson in selected), key=lambda item: item["pdfPage"])
+    citation_value = copy.deepcopy(ordered[0])
+    if ordered[-1]["page"] != ordered[0]["page"]:
+        citation_value["page"] = f"{ordered[0]['page']} to {ordered[-1]['page']}"
+        citation_value["pdfPageEnd"] = ordered[-1]["pdfPage"]
+    return citation_value
+
+
 def source_matching(
     question_id: str,
     module_id: str,
@@ -582,7 +616,7 @@ def source_matching(
             for index, lesson in enumerate(selected)
         ],
         "explanation": "Each pairing uses the statement extracted from that topic's cited handbook passage.",
-        "sourceCitation": selected[0]["sourceCitation"],
+        "sourceCitation": matching_citation(selected),
         "acsCodes": selected[0]["acsCodes"],
     }
 
