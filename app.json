@@ -40,7 +40,8 @@
       "expo-sqlite",
       "expo-font",
       "expo-image",
-      "expo-asset"
+      "expo-asset",
+      "expo-status-bar"
     ],
     "extra": {
       "sanityProjectId": "4qoowg94",
