@@ -21,5 +21,15 @@ export default defineConfig({
     }),
     visionTool({defaultApiVersion: '2026-07-12'}),
   ],
+  document: {
+    actions: (previousActions, context) =>
+      context.schemaType === 'contentReport'
+        ? previousActions.filter(
+            (action) => action.action !== 'publish' && action.action !== 'unpublish',
+          )
+        : previousActions,
+    newDocumentOptions: (previousOptions) =>
+      previousOptions.filter((option) => option.templateId !== 'contentReport'),
+  },
   schema: {types: schemaTypes},
 })
