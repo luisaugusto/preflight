@@ -26,20 +26,27 @@ export function QuestionInteraction({
   const [matched, setMatched] = useState<string[]>([]);
   const [activePair, setActivePair] = useState<string | null>(null);
   const [matchingMiss, setMatchingMiss] = useState(false);
-  const [choiceOptions] = useState(() =>
-    question.type === 'multipleChoice'
-      ? shuffle(question.options.map((label, originalIndex) => ({ label, originalIndex })))
-      : [],
+  const choiceOptions = useMemo(
+    () =>
+      question.type === 'multipleChoice'
+        ? shuffle(question.options.map((label, originalIndex) => ({ label, originalIndex })))
+        : [],
+    [question],
   );
-  const [matchingTerms] = useState(() =>
-    question.type === 'matching' ? shuffle(question.pairs) : [],
+  const matchingTerms = useMemo(
+    () => (question.type === 'matching' ? shuffle(question.pairs) : []),
+    [question],
   );
-  const [matchingDefinitions] = useState(() =>
-    question.type === 'matching' ? shuffle(question.pairs) : [],
+  const matchingDefinitions = useMemo(
+    () => (question.type === 'matching' ? shuffle(question.pairs) : []),
+    [question],
   );
 
   // Callers render one instance per question and key on the question id, so a
   // fresh mount already starts with clean answer state — no reset effect needed.
+  // The shuffled arrays above are recomputed via useMemo whenever `question`
+  // changes, so a content update that swaps the question in place (before the
+  // key changes) doesn't leave stale options/pairs behind.
 
   const correct = useMemo(() => {
     if (question.type === 'multipleChoice' || question.type === 'image') {
