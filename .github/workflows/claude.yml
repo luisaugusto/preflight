@@ -30,6 +30,18 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Match the toolchain used by the CI quality gate so Claude can reproduce
+      # failures locally before pushing a fix.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -46,4 +58,8 @@ jobs:
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          # Bash is disabled by default. Keep this allowlist aligned with the
+          # commands in ci.yml so Claude can install dependencies and verify its
+          # changes without granting arbitrary shell access.
+          claude_args: |
+            --allowedTools "Bash(npm ci),Bash(npm run typecheck),Bash(npm run lint),Bash(npm run format:check),Bash(npm test:*),Bash(npm run content:validate),Bash(npx expo-doctor@1.20.0)"
