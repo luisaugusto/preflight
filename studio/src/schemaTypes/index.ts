@@ -1,4 +1,5 @@
 import {acsCode} from './documents/acsCode'
+import {contentReport} from './documents/contentReport'
 import {contentRelease} from './documents/contentRelease'
 import {figure} from './documents/figure'
 import {glossaryTerm} from './documents/glossaryTerm'
@@ -34,4 +35,5 @@ export const schemaTypes = [
   glossaryTerm,
   acsCode,
   contentRelease,
+  contentReport,
 ]
