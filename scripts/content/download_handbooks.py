@@ -29,7 +29,7 @@ def main() -> None:
         pages = next(int(line.split(":", 1)[1]) for line in info.splitlines() if line.startswith("Pages:"))
         if pages != source.page_count:
             raise ValueError(f"{source.short_title} page count mismatch: expected {source.page_count}, got {pages}")
-        subprocess.run(["pdftotext", "-layout", str(output), str(PDF_DIR / f"{module_id}.txt")], check=True)
+        subprocess.run(["pdftotext", str(output), str(PDF_DIR / f"{module_id}-flow.txt")], check=True)
         print(f"Verified {source.short_title}: {pages} pages, sha256 {digest}")
 
 

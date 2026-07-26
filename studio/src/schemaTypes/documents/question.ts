@@ -1,6 +1,8 @@
 import {HelpCircleIcon} from '@sanity/icons/HelpCircle'
 import {defineArrayMember, defineField, defineType} from 'sanity'
 
+import {lifecycleField} from '../shared/curriculum'
+
 type QuestionValue = {
   questionType?: 'multipleChoice' | 'numeric' | 'matching' | 'image'
   multipleChoiceAnswer?: unknown
@@ -36,6 +38,7 @@ export const question = defineType({
       validation: (rule) =>
         rule.required().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {name: 'kebab-case ID'}),
     }),
+    {...lifecycleField, group: 'question'},
     defineField({
       name: 'title',
       title: 'Internal title',
@@ -211,8 +214,9 @@ export const question = defineType({
       title: 'Active',
       type: 'boolean',
       group: 'alignment',
+      hidden: true,
+      description: 'Legacy field. Use Lifecycle instead.',
       initialValue: true,
-      validation: (rule) => rule.required(),
     }),
     defineField({
       name: 'citations',

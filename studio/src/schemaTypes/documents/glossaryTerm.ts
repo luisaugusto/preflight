@@ -1,6 +1,8 @@
 import {TagIcon} from '@sanity/icons/Tag'
 import {defineArrayMember, defineField, defineType} from 'sanity'
 
+import {lifecycleField} from '../shared/curriculum'
+
 export const glossaryTerm = defineType({
   name: 'glossaryTerm',
   title: 'Glossary term',
@@ -20,6 +22,7 @@ export const glossaryTerm = defineType({
       validation: (rule) =>
         rule.required().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {name: 'kebab-case ID'}),
     }),
+    {...lifecycleField, group: 'definition'},
     defineField({
       name: 'term',
       title: 'Term',

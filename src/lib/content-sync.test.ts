@@ -5,6 +5,7 @@ import catalogJson from '../content/catalog.json';
 import {
   MemoryContentStore,
   compareContentVersions,
+  compareSemanticVersions,
   normalizeContent,
   normalizeCurriculum,
   overlayCurriculum,
@@ -106,14 +107,24 @@ const hash = async (raw: string) =>
 describe('content validation', () => {
   it('accepts the canonical top-level module and an optional bundle wrapper', () => {
     const module = makeModule('1.0.0');
-    expect(normalizeContent(module)).toEqual(module);
+    const normalized = normalizeContent(module);
+    expect(normalized).toMatchObject(module);
+    expect(normalized).toMatchObject({
+      lifecycle: 'active',
+      sections: [
+        {
+          lifecycle: 'active',
+          lessons: [{ lifecycle: 'active', isRequired: true }],
+        },
+      ],
+    });
     expect(
       normalizeContent({
         schemaVersion: 1,
         contentVersion: '1.0.0',
         module,
       }),
-    ).toEqual(module);
+    ).toEqual(normalized);
   });
 
   it('rejects invalid answer indexes and broken glossary references', () => {
@@ -142,11 +153,11 @@ describe('content validation', () => {
     ).rejects.toThrow('module id');
   });
 
-  it('accepts the four-module schema-v2 catalog and ordered manifest', async () => {
+  it('accepts the four-module schema-v3 catalog and ordered manifest', async () => {
     const catalog = normalizeCurriculum(catalogJson);
     const raw = JSON.stringify(catalogJson);
-    const v2Manifest: ContentManifest = {
-      schemaVersion: 2,
+    const v3Manifest: ContentManifest = {
+      schemaVersion: 3,
       catalogId: catalog.catalogId,
       moduleIds: catalog.modules.map((module) => module.id),
       contentVersion: catalog.contentVersion,
@@ -157,7 +168,7 @@ describe('content validation', () => {
     };
 
     await expect(
-      validateContentPayload(raw, v2Manifest, async () => 'c'.repeat(64)),
+      validateContentPayload(raw, v3Manifest, async () => 'c'.repeat(64)),
     ).resolves.toMatchObject({
       catalog: { catalogId: 'preflight-faa-curriculum' },
       module: { id: 'phak' },
@@ -165,7 +176,7 @@ describe('content validation', () => {
     await expect(
       validateContentPayload(
         raw,
-        { ...v2Manifest, moduleIds: ['afh', 'phak', 'awh', 'rmh'] },
+        { ...v3Manifest, moduleIds: ['afh', 'phak', 'awh', 'rmh'] },
         async () => 'c'.repeat(64),
       ),
     ).rejects.toThrow('module order');
@@ -185,6 +196,18 @@ describe('content validation', () => {
     expect(compareContentVersions('1.10.0', '1.9.0')).toBe(1);
     expect(compareContentVersions('v2.0', '2.0.0')).toBe(0);
     expect(compareContentVersions('1.0.0', '2.0.0')).toBe(-1);
+    expect(
+      compareContentVersions(
+        '2026.07.26-sanity.181500.aaaaaaaa',
+        '2026.07.26-sanity.093000.ffffffff',
+      ),
+    ).toBe(1);
+  });
+
+  it('uses SemVer prerelease precedence for app compatibility', () => {
+    expect(compareSemanticVersions('1.0.0', '1.0.0-beta')).toBe(1);
+    expect(compareSemanticVersions('1.0.0-beta.2', '1.0.0-beta.11')).toBe(-1);
+    expect(compareSemanticVersions('1.0.0+release.2', '1.0.0+release.1')).toBe(0);
   });
 });
 
@@ -235,5 +258,69 @@ describe('safe content updates', () => {
 
     expect(result.status).toBe('rolledBack');
     expect((await store.readActive())?.module.version).toBe('1.0.0');
+  });
+
+  it('keeps current content when a release requires a newer app', async () => {
+    const catalog = normalizeCurriculum(catalogJson);
+    const candidate = {
+      ...catalog,
+      minimumAppVersion: '2.0.0',
+    };
+    const raw = JSON.stringify(candidate);
+    const candidateManifest: ContentManifest = {
+      schemaVersion: 3,
+      catalogId: catalog.catalogId,
+      moduleIds: catalog.modules.map((module) => module.id),
+      contentVersion: catalog.contentVersion,
+      bundleUrl: 'https://cdn.example.com/catalog.json',
+      checksum: 'd'.repeat(64),
+      algorithm: 'sha256',
+      createdAt: catalog.generatedAt ?? '2026-07-26T00:00:00.000Z',
+      minimumAppVersion: '2.0.0',
+    };
+
+    const result = await updateContentFromManifest(candidateManifest, {
+      store: new MemoryContentStore(),
+      appVersion: '1.0.0',
+      hash: async () => 'd'.repeat(64),
+      downloadText: async () => raw,
+    });
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      error: 'Content requires app 2.0.0 or newer',
+    });
+  });
+
+  it('rejects a stable-only release on a prerelease app build', async () => {
+    const catalog = normalizeCurriculum(catalogJson);
+    const candidate = {
+      ...catalog,
+      minimumAppVersion: '1.0.0',
+    };
+    const raw = JSON.stringify(candidate);
+    const candidateManifest: ContentManifest = {
+      schemaVersion: 3,
+      catalogId: catalog.catalogId,
+      moduleIds: catalog.modules.map((module) => module.id),
+      contentVersion: catalog.contentVersion,
+      bundleUrl: 'https://cdn.example.com/catalog.json',
+      checksum: 'e'.repeat(64),
+      algorithm: 'sha256',
+      createdAt: catalog.generatedAt ?? '2026-07-26T00:00:00.000Z',
+      minimumAppVersion: '1.0.0',
+    };
+
+    const result = await updateContentFromManifest(candidateManifest, {
+      store: new MemoryContentStore(),
+      appVersion: '1.0.0-beta',
+      hash: async () => 'e'.repeat(64),
+      downloadText: async () => raw,
+    });
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      error: 'Content requires app 1.0.0 or newer',
+    });
   });
 });

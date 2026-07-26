@@ -6,6 +6,7 @@ import {z} from 'zod'
 
 export const PROJECT_ID = process.env.SANITY_STUDIO_PROJECT_ID ?? '4qoowg94'
 export const DATASET = process.env.SANITY_STUDIO_DATASET ?? 'production'
+export const RELEASE_DATASET = process.env.SANITY_RELEASE_DATASET ?? 'releases'
 export const API_VERSION = '2026-07-12'
 
 export const studioRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -16,6 +17,7 @@ export const figureAssetsPath = (moduleId: string) =>
 
 const nonEmptyString = z.string().trim().min(1)
 const contentId = nonEmptyString.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+const lifecycle = z.literal('active')
 
 export const sourceCitationSchema = z
   .object({
@@ -32,6 +34,7 @@ export const sourceCitationSchema = z
 
 const baseQuestionSchema = z.object({
   id: contentId,
+  lifecycle,
   moduleId: contentId,
   sectionId: contentId,
   prompt: nonEmptyString,
@@ -124,6 +127,7 @@ export const questionSchema = z.discriminatedUnion('type', [
 export const moduleContentSchema = z
   .object({
     id: contentId,
+    lifecycle,
     title: nonEmptyString,
     shortTitle: nonEmptyString,
     description: nonEmptyString,
@@ -141,6 +145,7 @@ export const moduleContentSchema = z
         z
           .object({
             id: contentId,
+            lifecycle,
             title: nonEmptyString,
             order: z.number().int().positive(),
             summary: nonEmptyString,
@@ -151,6 +156,8 @@ export const moduleContentSchema = z
                 z
                   .object({
                     id: contentId,
+                    lifecycle,
+                    isRequired: z.boolean(),
                     title: nonEmptyString,
                     order: z.number().int().positive(),
                     estimatedMinutes: z.number().int().min(1).max(5),
@@ -174,6 +181,7 @@ export const moduleContentSchema = z
       z
         .object({
           id: contentId,
+          lifecycle,
           term: nonEmptyString,
           definition: nonEmptyString,
           moduleId: contentId,
@@ -219,10 +227,12 @@ export const moduleContentSchema = z
 
 export const curriculumCatalogSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     catalogId: contentId,
     contentVersion: nonEmptyString,
     generatedAt: z.string().datetime(),
+    sourceDigest: nonEmptyString.regex(/^[a-f0-9]{64}$/),
+    minimumAppVersion: nonEmptyString,
     modules: z.array(moduleContentSchema).min(1),
   })
   .strict()

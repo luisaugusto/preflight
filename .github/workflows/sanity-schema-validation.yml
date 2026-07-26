@@ -1,0 +1,213 @@
+name: Sanity schema validation
+
+# Validate the complete Studio configuration on every pull request. This job is
+# intentionally credential-free so it also runs for Dependabot and forked PRs.
+on:
+  pull_request:
+
+# Cancel stale validation when a PR receives a newer commit.
+concurrency:
+  group: sanity-schema-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Sanity schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      # Studio requires Node 24.18+, independently of the Expo app's Node 22
+      # minimum. Pin the version tracked by studio/.nvmrc.
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: studio/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            studio/package-lock.json
+
+      # Sanity's manifest worker resolves the repository-level TypeScript
+      # configuration, which depends on the root Expo installation.
+      - name: Install app dependencies
+        working-directory: ${{ github.workspace }}
+        run: npm ci
+
+      - name: Install Studio dependencies
+        run: npm ci
+
+      # TypeScript catches invalid schema callbacks and configuration before the
+      # Sanity validator evaluates the assembled workspace schema.
+      - name: Typecheck Studio
+        run: npm run typecheck
+
+      - name: Validate schema
+        run: npm run schema:validate -- --workspace preflight --level warning
+
+      # A production build also evaluates custom tools and desk structure, which
+      # catches runtime conflicts outside the schema declaration itself.
+      - name: Build Studio
+        run: npm run build
+
+  production-compatibility:
+    name: Compare schema with production
+    # Pull request secrets are unavailable to forks and Dependabot. Their local
+    # validation job still runs, but production comparison must not receive a
+    # deploy token in an untrusted checkout.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          # The exact PR base is needed for the three-way drift check below.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: studio/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            studio/package-lock.json
+
+      - name: Install app dependencies
+        working-directory: ${{ github.workspace }}
+        run: npm ci
+
+      - name: Install proposed Studio dependencies
+        run: npm ci
+
+      - name: Require Sanity deployment credentials
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$SANITY_AUTH_TOKEN" ]; then
+            echo "::error::Add the SANITY_AUTH_TOKEN repository Actions secret before production schema comparison can run."
+            exit 1
+          fi
+
+      - name: Extract proposed schema
+        run: |
+          comparison_dir="$RUNNER_TEMP/sanity-schema-comparison"
+          proposed_manifest_dir="$comparison_dir/proposed-manifest"
+          mkdir -p "$proposed_manifest_dir"
+          npx sanity manifest extract --path "$proposed_manifest_dir"
+          proposed_schema_file="$(
+            jq -r '.workspaces[] | select(.name == "preflight") | .schema' \
+              "$proposed_manifest_dir/create-manifest.json"
+          )"
+          jq -S '.' "$proposed_manifest_dir/$proposed_schema_file" \
+            > "$comparison_dir/proposed-schema.json"
+
+      # Production should match the schema from the PR's base commit. If it
+      # does not, an out-of-band deployment would be overwritten by this PR and
+      # the branch must first be reconciled with production.
+      - name: Extract schema from pull request base
+        run: |
+          comparison_dir="$RUNNER_TEMP/sanity-schema-comparison"
+          base_worktree="$RUNNER_TEMP/preflight-base"
+          base_manifest_dir="$comparison_dir/base-manifest"
+          git worktree add --detach "$base_worktree" \
+            "${{ github.event.pull_request.base.sha }}"
+          (
+            cd "$base_worktree"
+            npm ci
+            cd studio
+            npm ci
+            npx sanity manifest extract --path "$base_manifest_dir"
+          )
+          base_schema_file="$(
+            jq -r '.workspaces[] | select(.name == "preflight") | .schema' \
+              "$base_manifest_dir/create-manifest.json"
+          )"
+          jq -S '.' "$base_manifest_dir/$base_schema_file" \
+            > "$comparison_dir/base-schema.json"
+
+      - name: Download deployed production schema
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+        run: |
+          comparison_dir="$RUNNER_TEMP/sanity-schema-comparison"
+          npx sanity schemas list --json --id '_.schemas.preflight' \
+            | jq -S '.schema | fromjson' \
+            > "$comparison_dir/production-schema.json"
+
+      - name: Compare schema definitions
+        run: |
+          comparison_dir="$RUNNER_TEMP/sanity-schema-comparison"
+          drift_diff="$comparison_dir/base-to-production.diff"
+          proposed_diff="$comparison_dir/production-to-proposed.diff"
+
+          if ! diff -u \
+            "$comparison_dir/base-schema.json" \
+            "$comparison_dir/production-schema.json" \
+            > "$drift_diff"; then
+            {
+              echo "### ❌ Production schema drift detected"
+              echo
+              echo "The deployed schema differs from this pull request's base commit."
+              echo "Reconcile or redeploy \`main\` before merging so this PR does not"
+              echo "overwrite out-of-band production changes. See the comparison artifact."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::The production schema has drifted from the pull request base."
+            exit 1
+          fi
+
+          if diff -u \
+            "$comparison_dir/production-schema.json" \
+            "$comparison_dir/proposed-schema.json" \
+            > "$proposed_diff"; then
+            {
+              echo "### ✅ Schema matches production"
+              echo
+              echo "This pull request does not change the deployed schema."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ✅ Production baseline is current"
+              echo
+              echo "This pull request changes the schema. The exact production-to-proposed"
+              echo "diff is attached to this run for review."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Validate every live published and draft document with the proposed
+      # schema. This is the semantic compatibility check: incompatible field
+      # changes or newly invalid documents fail the pull request.
+      - name: Validate production documents against proposed schema
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+        run: >-
+          npx sanity documents validate
+          --workspace preflight
+          --dataset production
+          --yes
+          --level warning
+
+      - name: Upload schema comparison
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sanity-schema-comparison-${{ github.event.pull_request.number }}
+          path: |
+            ${{ runner.temp }}/sanity-schema-comparison/*.json
+            ${{ runner.temp }}/sanity-schema-comparison/*.diff
+          if-no-files-found: ignore
+          retention-days: 14

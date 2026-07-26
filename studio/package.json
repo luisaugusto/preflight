@@ -11,11 +11,16 @@
     "schema:deploy": "sanity schemas deploy --verbose",
     "typegen": "sanity schema extract --enforce-required-fields && sanity typegen generate",
     "typecheck": "tsc --noEmit",
-    "seed:catalog": "tsx scripts/seed-catalog.ts",
-    "seed:catalog:cli": "sanity exec scripts/seed-catalog.ts --with-user-token -- --publish",
-    "seed:catalog:dry-run": "tsx scripts/seed-catalog.ts --dry-run --publish",
+    "legacy:seed-catalog": "tsx scripts/seed-catalog.ts",
+    "legacy:seed-catalog:cli": "sanity exec scripts/seed-catalog.ts --with-user-token -- --publish",
+    "legacy:seed-catalog:dry-run": "tsx scripts/seed-catalog.ts --dry-run --publish",
     "export:bundle": "tsx scripts/export-bundle.ts",
-    "export:bundle:dry-run": "tsx scripts/export-bundle.ts --dry-run"
+    "export:bundle:dry-run": "tsx scripts/export-bundle.ts --dry-run",
+    "catalog:export": "tsx scripts/export-catalog.ts",
+    "catalog:export:dry-run": "tsx scripts/export-catalog.ts --dry-run",
+    "catalog:publish": "tsx scripts/publish-catalog-release.ts",
+    "catalog:publish:dry-run": "tsx scripts/publish-catalog-release.ts --dry-run",
+    "catalog:migrate": "tsx scripts/migrate-curriculum-authority.ts"
   },
   "dependencies": {
     "@sanity/client": "^7.23.0",
@@ -28,8 +33,10 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "prettier": "^3.9.5",
     "tsx": "^4.23.0",
     "typescript": "^5.9.3"
   },
