@@ -42,7 +42,13 @@ jobs:
         with:
           node-version-file: studio/.nvmrc
           cache: npm
-          cache-dependency-path: studio/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            studio/package-lock.json
+
+      - name: Install app dependencies
+        working-directory: ${{ github.workspace }}
+        run: npm ci
 
       - name: Install Studio dependencies
         run: npm ci
@@ -51,6 +57,19 @@ jobs:
       # requests still passes on the merged commit.
       - name: Validate schema
         run: npm run schema:validate -- --workspace preflight --level warning
+
+      # Re-run the semantic compatibility check against the latest production
+      # documents immediately before deployment. This closes the race between a
+      # pull request check and a later merge.
+      - name: Validate production documents against merged schema
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+        run: >-
+          npx sanity documents validate
+          --workspace preflight
+          --dataset production
+          --yes
+          --level warning
 
       # Pin the official action to the v0.9-alpha commit. `sanity deploy`
       # publishes the hosted Studio and its schema together; --schema-required
