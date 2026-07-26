@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 PDF_DIR = ROOT / "tmp" / "pdfs"
 OUTPUT = ROOT / "src" / "content" / "catalog.json"
 COVERAGE_OUTPUT = ROOT / "scripts" / "content" / "coverage.json"
-CONTENT_VERSION = "2026.07.14-questions.2"
-GENERATED_AT = "2026-07-14T22:07:20.000Z"
+CONTENT_VERSION = "2026.07.14-questions.3"
+GENERATED_AT = "2026-07-26T15:55:04.000Z"
 STOP_WORDS = {
     "about", "after", "airplane", "aircraft", "and", "aviation", "before", "chapter",
     "flight", "from", "into", "operations", "the", "their", "this", "through", "using",
@@ -576,11 +576,20 @@ def matching_citation(selected: list[dict]) -> dict:
     """Build a citation that covers every paired lesson's cited page, so the single
     citation shown with a matching question lets a learner verify every pair rather
     than only the first lesson selected."""
-    ordered = sorted((lesson["sourceCitation"] for lesson in selected), key=lambda item: item["pdfPage"])
-    citation_value = copy.deepcopy(ordered[0])
-    if ordered[-1]["page"] != ordered[0]["page"]:
-        citation_value["page"] = f"{ordered[0]['page']} to {ordered[-1]['page']}"
-        citation_value["pdfPageEnd"] = ordered[-1]["pdfPage"]
+    citations = [lesson["sourceCitation"] for lesson in selected]
+    first = min(citations, key=lambda item: item["pdfPage"])
+    last = max(citations, key=lambda item: item.get("pdfPageEnd", item["pdfPage"]))
+    first_printed = str(first["page"]).split(" to ", 1)[0]
+    last_printed = str(last["page"]).rsplit(" to ", 1)[-1]
+    last_pdf_page = last.get("pdfPageEnd", last["pdfPage"])
+
+    citation_value = copy.deepcopy(first)
+    if last_pdf_page != first["pdfPage"]:
+        citation_value["page"] = f"{first_printed} to {last_printed}"
+        citation_value["pdfPageEnd"] = last_pdf_page
+    else:
+        citation_value["page"] = first_printed
+        citation_value.pop("pdfPageEnd", None)
     return citation_value
 
 
