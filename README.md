@@ -53,7 +53,32 @@ As a defense-in-depth complement to the CI gate, enable GitHub's native **secret
 
 ## Content pipeline
 
-The reproducible handbook pipeline is documented in [scripts/content/README.md](./scripts/content/README.md). It pins all four official FAA sources, extracts handbook text and representative figures, builds `src/content/catalog.json`, and rejects invalid coverage, citations, ACS tags, answer keys, provenance, image references, repeated question patterns, title-identification answers, extraction artifacts, or questions that are not grounded in their cited lesson text.
+Published Sanity documents are the curriculum source of truth. The ordered
+`curriculumCatalog.current` document owns module order; modules own sections,
+sections own lessons and quizzes, and lessons own practice questions. Keep
+stable IDs unchanged. To remove content, set its lifecycle to **Retired** and
+remove its parent reference instead of deleting it, so existing learner history
+remains attributable.
+
+Every Monday, [curriculum-release-pr.yml](./.github/workflows/curriculum-release-pr.yml)
+checks for published Sanity changes and deterministically exports the complete
+schema-v3 curriculum. If the snapshot changed, it opens or refreshes a PR that
+contains `src/content/catalog.json`. The workflow can also be run manually.
+Merging that reviewed PR publishes those exact bytes as an immutable Sanity CDN
+bundle and manifest, then advances `curriculumReleasePointer.current` in the
+public, manifest-only `releases` dataset. Authored content and reports remain in
+the private `production` dataset.
+
+The checked-in catalog remains the app's offline fallback. Compatible installed
+apps query the stable release pointer on launch, verify the manifest checksum,
+atomically activate the new catalog, and roll back on failure. A content-only
+release therefore does not require an App Store version or EAS Update. Raise
+`minimumAppVersion` when content needs newer app behavior; older apps keep their
+last compatible catalog.
+
+The original reproducible handbook extraction tools remain documented in
+[scripts/content/README.md](./scripts/content/README.md). They are for sourcing
+and auditing FAA material, not for overwriting authored Sanity content.
 
 A weekly [link check](./.github/workflows/link-check.yml) (via [lychee](https://github.com/lycheeverse/lychee)) validates the FAA source URLs configured in this pipeline alongside every Markdown link, so a rotted citation can't silently break traceability. It fails any pull request that touches docs and, on the scheduled run, opens a self-closing tracking issue instead of blocking unrelated work. Known-flaky and placeholder hosts are allowlisted in [lychee.toml](./lychee.toml).
 
@@ -79,13 +104,15 @@ npm run studio
 npm run studio:deploy-schema
 ```
 
-After authenticating the Sanity CLI, validate the complete catalog without mutations, then publish all four modules, assets, and the schema-v2 release:
+Use the Studio to make and publish lesson, question, glossary, figure, and
+structural changes. Reorder entities only in parent-owned reference arrays.
+Validate a deterministic export locally with:
 
 ```sh
 cd studio
-npm run schema:deploy
-npm run seed:catalog:dry-run
-npm run seed:catalog:cli
+SANITY_AUTH_TOKEN=... npm run catalog:export
+cd ..
+npm run content:validate
 ```
 
 Pull requests run a credential-free Sanity schema validation, Studio typecheck,
@@ -101,14 +128,19 @@ The deployment workflow requires a repository Actions secret named
 deploy the Studio and schema for project `4qoowg94`; do not use a token in any
 `EXPO_PUBLIC_*` variable.
 
-Alternatively, provide a server-side Editor token only to the seed process:
+The weekly curriculum PR workflow also requires
+`CURRICULUM_RELEASE_TOKEN`, a fine-grained GitHub token scoped only to this
+repository with **Contents: Read and write** and **Pull requests: Read and
+write**. A separate token is necessary because GitHub intentionally suppresses
+PR workflow events for branches created with the built-in `GITHUB_TOKEN`;
+using the release token ensures every generated curriculum PR receives the
+normal required checks.
 
-```sh
-cd studio
-SANITY_AUTH_TOKEN=... npm run seed:catalog -- --publish
-```
-
-Never expose that token through an `EXPO_PUBLIC_` variable or bundle it into the app. The idempotent import creates or replaces 1,745 published curriculum documents, uploads 89 figures, and uploads the checksum-verified catalog and manifest to Sanity's CDN. Omitting `--publish` writes review drafts instead.
+Never expose that token through an `EXPO_PUBLIC_` variable or bundle it into the
+app. The `legacy:seed-catalog` and `catalog:migrate` commands are
+bootstrap/migration
+tools only; normal content work flows from Sanity to the generated snapshot and
+must not run the old repo-to-Sanity importer.
 
 ### In-app content reports
 

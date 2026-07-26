@@ -1,6 +1,8 @@
 import {acsCode} from './documents/acsCode'
 import {contentReport} from './documents/contentReport'
 import {contentRelease} from './documents/contentRelease'
+import {curriculumCatalog} from './documents/curriculumCatalog'
+import {curriculumReleasePointer} from './documents/curriculumReleasePointer'
 import {figure} from './documents/figure'
 import {glossaryTerm} from './documents/glossaryTerm'
 import {lesson} from './documents/lesson'
@@ -27,6 +29,7 @@ export const schemaTypes = [
   matchingAnswerSpec,
   imageQuestionSpec,
   lessonBlock,
+  curriculumCatalog,
   module,
   section,
   lesson,
@@ -35,5 +38,6 @@ export const schemaTypes = [
   glossaryTerm,
   acsCode,
   contentRelease,
+  curriculumReleasePointer,
   contentReport,
 ]

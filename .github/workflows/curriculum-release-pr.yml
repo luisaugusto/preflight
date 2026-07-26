@@ -1,0 +1,149 @@
+name: Prepare curriculum release
+
+on:
+  schedule:
+    # Monday at 09:00 Pacific during daylight-saving time.
+    - cron: '0 16 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: curriculum-release-pr
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Export Sanity curriculum and open PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          # A bot/user token is required because GitHub suppresses pull_request
+          # workflows for branches and PRs created with GITHUB_TOKEN.
+          token: ${{ secrets.CURRICULUM_RELEASE_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: studio/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            studio/package-lock.json
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install Studio dependencies
+        working-directory: studio
+        run: npm ci
+
+      - name: Export complete published curriculum
+        id: export
+        working-directory: studio
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            npm run catalog:export -- --require-recent-updates 8 \
+              | tee "$RUNNER_TEMP/catalog-export.json"
+          else
+            npm run catalog:export | tee "$RUNNER_TEMP/catalog-export.json"
+          fi
+
+          if git -C "$GITHUB_WORKSPACE" diff --quiet -- src/content/catalog.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate generated app snapshot
+        if: steps.export.outputs.changed == 'true'
+        run: |
+          npm run content:validate
+          npm run typecheck
+          npm test -- --runInBand
+
+      - name: Push release branch
+        if: steps.export.outputs.changed == 'true'
+        env:
+          RELEASE_BRANCH: automation/sanity-curriculum-release
+        run: |
+          git fetch origin "$RELEASE_BRANCH:refs/remotes/origin/$RELEASE_BRANCH" || true
+          git config user.name "preflight-content-bot"
+          git config user.email "preflight-content-bot@users.noreply.github.com"
+          git switch -C "$RELEASE_BRANCH"
+          git add src/content/catalog.json
+          git commit -m "Update curriculum snapshot from Sanity"
+          git push --force-with-lease origin "$RELEASE_BRANCH"
+
+      - name: Create or update curriculum release PR
+        if: steps.export.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CURRICULUM_RELEASE_TOKEN }}
+          RELEASE_BRANCH: automation/sanity-curriculum-release
+        run: |
+          version="$(jq -r '.contentVersion' src/content/catalog.json)"
+          source_digest="$(jq -r '.sourceDigest' src/content/catalog.json)"
+          modules="$(jq '.modules | length' src/content/catalog.json)"
+          sections="$(jq '[.modules[].sections[]] | length' src/content/catalog.json)"
+          lessons="$(jq '[.modules[].sections[].lessons[]] | length' src/content/catalog.json)"
+          questions="$(jq '[
+            .modules[].sections[].lessons[].practice,
+            .modules[].sections[].quiz[],
+            .modules[].exam[]
+          ] | length' src/content/catalog.json)"
+          body="$RUNNER_TEMP/curriculum-release-pr.md"
+          {
+            echo "## Curriculum release"
+            echo
+            echo "This PR is generated from the complete published Sanity curriculum."
+            echo "Merging it publishes these exact reviewed bytes to the Sanity CDN and"
+            echo "advances the stable app release pointer."
+            echo
+            echo "- Version: \`$version\`"
+            echo "- Source digest: \`$source_digest\`"
+            echo "- Modules: $modules"
+            echo "- Sections: $sections"
+            echo "- Lessons: $lessons"
+            echo "- Questions: $questions"
+            echo
+            echo "The bundled \`catalog.json\` remains the offline fallback. Sanity is the"
+            echo "authoritative source for content and curriculum ordering."
+          } > "$body"
+
+          existing="$(
+            gh pr list \
+              --state open \
+              --head "$RELEASE_BRANCH" \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" \
+              --title "Publish curriculum $version" \
+              --body-file "$body"
+          else
+            gh pr create \
+              --base main \
+              --head "$RELEASE_BRANCH" \
+              --title "Publish curriculum $version" \
+              --body-file "$body"
+          fi
+
+      - name: Report no content change
+        if: steps.export.outputs.changed != 'true'
+        run: |
+          {
+            echo "### No curriculum release needed"
+            echo
+            echo "The published Sanity curriculum produces the same deterministic"
+            echo "app snapshot as the current release."
+          } >> "$GITHUB_STEP_SUMMARY"

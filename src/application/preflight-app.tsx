@@ -16,6 +16,7 @@ import { answerOutcomeToRating, createReviewCard, scheduleReview } from '@/lib/f
 import {
   ExpoFileContentStore,
   MemoryContentStore,
+  normalizeCurriculum,
   overlayCurriculum,
   syncContent,
 } from '@/lib/content-sync';
@@ -54,7 +55,7 @@ type AppRoute =
   | 'info'
   | 'modules';
 
-const bundledCurriculum = catalogContent as CurriculumBundle;
+const bundledCurriculum = normalizeCurriculum(catalogContent);
 const firstBundledModule = bundledCurriculum.modules[0];
 
 function reconcileCompletedSections(
@@ -68,7 +69,9 @@ function reconcileCompletedSections(
         .filter(
           (section) =>
             recordedSectionIds.has(section.id) &&
-            section.lessons.every((lesson) => completedLessonIds.has(lesson.id)),
+            section.lessons
+              .filter((lesson) => lesson.isRequired !== false)
+              .every((lesson) => completedLessonIds.has(lesson.id)),
         )
         .map((section) => section.id),
     ),
@@ -188,7 +191,10 @@ export function PreflightApp() {
           );
         }
         if (!manifestUrl) return;
-        const result = await syncContent(manifestUrl, { store });
+        const result = await syncContent(manifestUrl, {
+          store,
+          appVersion: Constants.expoConfig?.version,
+        });
         if (mounted && result.active?.catalog) {
           setCurriculum(
             result.active.manifest.schemaVersion >= 2

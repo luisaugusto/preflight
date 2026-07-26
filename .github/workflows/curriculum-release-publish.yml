@@ -1,0 +1,51 @@
+name: Publish curriculum release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/content/catalog.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: curriculum-release-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish reviewed catalog and advance pointer
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - name: Check out reviewed main commit
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: studio/.nvmrc
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+
+      - name: Install Studio dependencies
+        run: npm ci
+
+      - name: Validate exact reviewed snapshot
+        run: npm run catalog:publish:dry-run
+
+      - name: Publish immutable bundle and stable release pointer
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$SANITY_AUTH_TOKEN" ]; then
+            echo "::error::SANITY_AUTH_TOKEN is required to publish curriculum."
+            exit 1
+          fi
+          npm run catalog:publish

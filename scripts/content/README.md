@@ -1,8 +1,9 @@
 # FAA curriculum content pipeline
 
-The schema-v2 catalog combines four checksum-pinned FAA handbooks. The legacy
-`src/content/phak.json` remains available only for schema-v1 sync compatibility;
-`src/content/catalog.json` is the canonical bundled curriculum.
+The extraction tooling combines four checksum-pinned FAA handbooks. Sanity is
+now the canonical authored curriculum; `src/content/catalog.json` is a
+deterministic schema-v3 offline snapshot exported from published Sanity
+documents. Do not run this extraction pipeline to overwrite normal Studio edits.
 
 ## Authoritative sources
 

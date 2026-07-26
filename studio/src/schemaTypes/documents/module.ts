@@ -1,6 +1,8 @@
 import {BookIcon} from '@sanity/icons/Book'
 import {defineArrayMember, defineField, defineType} from 'sanity'
 
+import {lifecycleField} from '../shared/curriculum'
+
 type ModuleValue = {
   status?: string
   publishedAt?: string
@@ -27,6 +29,7 @@ export const module = defineType({
       validation: (rule) =>
         rule.required().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {name: 'kebab-case ID'}),
     }),
+    {...lifecycleField, group: 'identity'},
     defineField({
       name: 'title',
       title: 'Title',
@@ -69,7 +72,7 @@ export const module = defineType({
       title: 'Ordered sections',
       type: 'array',
       group: 'curriculum',
-      of: [defineArrayMember({type: 'reference', weak: true, to: [{type: 'section'}]})],
+      of: [defineArrayMember({type: 'reference', to: [{type: 'section'}]})],
       validation: (rule) => rule.required().min(1).unique(),
     }),
     defineField({
@@ -77,7 +80,7 @@ export const module = defineType({
       title: 'Final exam questions',
       type: 'array',
       group: 'curriculum',
-      of: [defineArrayMember({type: 'reference', weak: true, to: [{type: 'question'}]})],
+      of: [defineArrayMember({type: 'reference', to: [{type: 'question'}]})],
       validation: (rule) => rule.required().min(1).unique(),
     }),
     defineField({
@@ -85,7 +88,7 @@ export const module = defineType({
       title: 'Glossary terms',
       type: 'array',
       group: 'curriculum',
-      of: [defineArrayMember({type: 'reference', weak: true, to: [{type: 'glossaryTerm'}]})],
+      of: [defineArrayMember({type: 'reference', to: [{type: 'glossaryTerm'}]})],
       validation: (rule) => rule.unique(),
     }),
     defineField({

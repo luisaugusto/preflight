@@ -86,7 +86,7 @@ export const contentRelease = defineType({
       title: 'Bundle schema version',
       type: 'number',
       group: 'bundle',
-      initialValue: 1,
+      initialValue: 3,
       validation: (rule) => rule.required().integer().positive(),
     }),
     defineField({
@@ -111,6 +111,21 @@ export const contentRelease = defineType({
       group: 'bundle',
       description: 'Lowercase 64-character hexadecimal digest.',
       validation: (rule) => rule.regex(/^[a-f0-9]{64}$/, {name: 'SHA-256 digest'}),
+    }),
+    defineField({
+      name: 'sourceDigest',
+      title: 'Sanity source digest',
+      type: 'string',
+      group: 'bundle',
+      description: 'Digest of the complete validated curriculum graph used for this release.',
+      validation: (rule) => rule.regex(/^[a-f0-9]{64}$/, {name: 'SHA-256 digest'}),
+    }),
+    defineField({
+      name: 'bundleByteLength',
+      title: 'Bundle byte length',
+      type: 'number',
+      group: 'bundle',
+      validation: (rule) => rule.integer().positive(),
     }),
     defineField({
       name: 'assetManifestUrl',

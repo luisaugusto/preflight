@@ -182,15 +182,22 @@ class Validation:
             if isinstance(image, dict):
                 for field in ("uri", "alt", "caption", "sourcePage"):
                     self.text(image.get(field), f"{path}.image.{field}")
-                asset = ROOT / str(image.get("uri", ""))
-                self.require(asset.is_file() and asset.stat().st_size > 50_000, f"{path}: missing or undersized image asset {image.get('uri')}")
-                figure_source = FIGURE_SOURCES.get(str(image.get("uri", "")), {})
-                self.require(
-                    figure_source.get("moduleId") == module_id
-                    and figure_source.get("pdfChecksum") == source.checksum
-                    and figure_source.get("pdfPage") == question.get("sourceCitation", {}).get("pdfPage"),
-                    f"{path}: figure source manifest does not match the cited PDF page",
-                )
+                uri = str(image.get("uri", ""))
+                if uri.startswith("https://"):
+                    self.require(
+                        uri.startswith("https://cdn.sanity.io/"),
+                        f"{path}: remote image must use the Sanity CDN",
+                    )
+                else:
+                    asset = ROOT / uri
+                    self.require(asset.is_file() and asset.stat().st_size > 50_000, f"{path}: missing or undersized image asset {uri}")
+                    figure_source = FIGURE_SOURCES.get(uri, {})
+                    self.require(
+                        figure_source.get("moduleId") == module_id
+                        and figure_source.get("pdfChecksum") == source.checksum
+                        and figure_source.get("pdfPage") == question.get("sourceCitation", {}).get("pdfPage"),
+                        f"{path}: figure source manifest does not match the cited PDF page",
+                    )
 
 
 def validate_generated_question_quality(
@@ -334,19 +341,26 @@ def validate_generated_question_quality(
 
 def validate_catalog(catalog: dict, coverage: dict) -> Validation:
     result = Validation()
-    result.require(catalog.get("schemaVersion") == 2, "catalog.schemaVersion must be 2")
+    schema_version = catalog.get("schemaVersion")
+    result.require(schema_version in (2, 3), "catalog.schemaVersion must be 2 or 3")
     result.text(catalog.get("catalogId"), "catalog.catalogId")
     result.text(catalog.get("contentVersion"), "catalog.contentVersion")
     modules = catalog.get("modules")
     result.require(isinstance(modules, list), "catalog.modules must be an array")
     if not isinstance(modules, list):
         return result
-    result.require([module.get("id") for module in modules] == ["phak", "afh", "awh", "rmh"], "catalog module order must be PHAK, AFH, AWH, RMH")
+    if schema_version == 2:
+        result.require([module.get("id") for module in modules] == ["phak", "afh", "awh", "rmh"], "schema-v2 catalog module order must be PHAK, AFH, AWH, RMH")
+    else:
+        result.text(catalog.get("sourceDigest"), "catalog.sourceDigest")
+        result.text(catalog.get("minimumAppVersion"), "catalog.minimumAppVersion")
     coverage_by_module = {module["moduleId"]: module for module in coverage.get("modules", [])}
 
     for module in modules:
         module_id = module.get("id")
         result.unique_id(module_id, f"modules[{module_id}].id")
+        if schema_version == 3:
+            result.require(module.get("lifecycle") == "active", f"{module_id}: module must be active")
         result.require(module_id in MODULE_SPECS, f"unknown module {module_id}")
         if module_id not in MODULE_SPECS:
             continue
@@ -361,20 +375,26 @@ def validate_catalog(catalog: dict, coverage: dict) -> Validation:
         generated_practices: list[tuple[dict, dict, str]] = []
         generated_questions: list[tuple[dict, str]] = []
         expected_sections, expected_lessons, expected_quiz, expected_exam, expected_terms = EXPECTED[module_id]
-        result.require(len(sections) == expected_sections, f"{module_id}: expected {expected_sections} sections")
-        result.require([section.get("order") for section in sections] == list(range(1, expected_sections + 1)), f"{module_id}: section order is not contiguous")
+        if schema_version == 2:
+            result.require(len(sections) == expected_sections, f"{module_id}: expected {expected_sections} sections")
+        result.require([section.get("order") for section in sections] == list(range(1, len(sections) + 1)), f"{module_id}: section order is not contiguous")
         for section_index, section in enumerate(sections):
             path = f"{module_id}.sections[{section_index}]"
             result.unique_id(section.get("id"), f"{path}.id")
+            if schema_version == 3:
+                result.require(section.get("lifecycle") == "active", f"{path}: section must be active")
             result.text(section.get("title"), f"{path}.title")
             result.text(section.get("summary"), f"{path}.summary", 40)
             result.acs(section.get("acsCodes"), f"{path}.acsCodes")
             lessons = section.get("lessons", [])
-            result.require(2 <= len(lessons) <= 6, f"{path}: expected 2..6 lessons")
+            result.require(1 <= len(lessons) <= 20, f"{path}: expected 1..20 lessons")
             result.require([lesson.get("order") for lesson in lessons] == list(range(1, len(lessons) + 1)), f"{path}: lesson order invalid")
             for lesson_index, lesson in enumerate(lessons):
                 lesson_path = f"{path}.lessons[{lesson_index}]"
                 result.unique_id(lesson.get("id"), f"{lesson_path}.id")
+                if schema_version == 3:
+                    result.require(lesson.get("lifecycle") == "active", f"{lesson_path}: lesson must be active")
+                    result.require(isinstance(lesson.get("isRequired"), bool), f"{lesson_path}.isRequired must be boolean")
                 for field, minimum in (("title", 3), ("concept", 30), ("explanation", 60), ("workedExample", 80)):
                     result.text(lesson.get(field), f"{lesson_path}.{field}", minimum)
                 result.citation(lesson.get("sourceCitation"), f"{lesson_path}.sourceCitation", source)
@@ -398,10 +418,12 @@ def validate_catalog(catalog: dict, coverage: dict) -> Validation:
             result.require(len({question.get("type") for question in quiz}) >= 3, f"{path}: quiz must use at least three interaction types")
             result.require(any(question.get("type") == "image" for question in quiz), f"{path}: quiz requires an image question")
 
-        result.require(sum(len(section["lessons"]) for section in sections) == expected_lessons, f"{module_id}: lesson count mismatch")
-        result.require(sum(len(section["quiz"]) for section in sections) == expected_quiz, f"{module_id}: section-question count mismatch")
+        if schema_version == 2:
+            result.require(sum(len(section["lessons"]) for section in sections) == expected_lessons, f"{module_id}: lesson count mismatch")
+            result.require(sum(len(section["quiz"]) for section in sections) == expected_quiz, f"{module_id}: section-question count mismatch")
         exam = module.get("exam", [])
-        result.require(len(exam) == expected_exam, f"{module_id}: exam count mismatch")
+        if schema_version == 2:
+            result.require(len(exam) == expected_exam, f"{module_id}: exam count mismatch")
         for index, question in enumerate(exam):
             question_path = f"{module_id}.exam[{index}]"
             result.question(question, question_path, module_id, section_ids, source)
@@ -430,7 +452,8 @@ def validate_catalog(catalog: dict, coverage: dict) -> Validation:
             generated_questions,
         )
         glossary = module.get("glossary", [])
-        result.require(len(glossary) == expected_terms, f"{module_id}: glossary count mismatch")
+        if schema_version == 2:
+            result.require(len(glossary) == expected_terms, f"{module_id}: glossary count mismatch")
         for index, term in enumerate(glossary):
             path = f"{module_id}.glossary[{index}]"
             result.unique_id(term.get("id"), f"{path}.id")

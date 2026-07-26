@@ -16,10 +16,12 @@ describe('checked-in PHAK content', () => {
 });
 
 describe('checked-in FAA curriculum catalog', () => {
-  it('satisfies the schema-v2 runtime contract with complete provenance', () => {
+  it('satisfies the Sanity-authored schema-v3 contract with complete provenance', () => {
     const catalog = normalizeCurriculum(catalogJson);
 
-    expect(catalog.schemaVersion).toBe(2);
+    expect(catalog.schemaVersion).toBe(3);
+    expect(catalog.sourceDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(catalog.minimumAppVersion).toBe('1.0.0');
     expect(catalog.modules.map((module) => module.id)).toEqual(['phak', 'afh', 'awh', 'rmh']);
     expect(catalog.modules.reduce((total, module) => total + module.sections.length, 0)).toBe(89);
     expect(
@@ -34,6 +36,7 @@ describe('checked-in FAA curriculum catalog', () => {
       const sectionIds = new Set(module.sections.map((section) => section.id));
       module.sections.forEach((section) => {
         section.lessons.forEach((lesson) => {
+          expect(lesson).toMatchObject({ lifecycle: 'active', isRequired: true });
           expect(lesson.sourceCitation.pdfPage).toBeGreaterThan(0);
           expect(lesson.practice).toMatchObject({ moduleId: module.id, sectionId: section.id });
         });

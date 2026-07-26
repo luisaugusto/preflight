@@ -114,4 +114,30 @@ describe('sequential progression', () => {
     expect(isModuleExamUnlocked(moduleContent, threeOfFour)).toBe(false);
     expect(isModuleExamUnlocked(moduleContent, [...threeOfFour, 'section-2-lesson-2'])).toBe(true);
   });
+
+  it('does not revoke completion when an optional lesson is added', () => {
+    const optional = lesson('section-1-optional', 3);
+    optional.isRequired = false;
+    moduleContent.sections.find((item) => item.id === 'section-1')?.lessons.push(optional);
+
+    const required = ['section-1-lesson-1', 'section-1-lesson-2'];
+    expect(getSectionStatus(moduleContent, 'section-1', required)).toBe('complete');
+
+    moduleContent.sections.find((item) => item.id === 'section-1')?.lessons.pop();
+  });
+
+  it('marks a previously completed section when new required work is added', () => {
+    const currentSection = moduleContent.sections.find((item) => item.id === 'section-1');
+    currentSection?.lessons.push(lesson('section-1-new-required', 3));
+
+    expect(
+      getSectionStatus(moduleContent, 'section-1', [
+        'section-1',
+        'section-1-lesson-1',
+        'section-1-lesson-2',
+      ]),
+    ).toBe('updateRequired');
+
+    currentSection?.lessons.pop();
+  });
 });
