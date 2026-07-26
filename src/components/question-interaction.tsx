@@ -7,6 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { ContentReport } from '@/components/content-report';
 import { FIGURE_ASSETS } from '@/content/figure-assets';
 import type { Question } from '@/lib/content/types';
+import { shuffle } from '@/lib/randomize';
 import { Card, Feedback, Option, PrimaryButton } from '@/components/ui';
 import { colors, fonts, type } from '@/theme';
 
@@ -25,13 +26,26 @@ export function QuestionInteraction({
   const [matched, setMatched] = useState<string[]>([]);
   const [activePair, setActivePair] = useState<string | null>(null);
   const [matchingMiss, setMatchingMiss] = useState(false);
+  const [choiceOptions] = useState(() =>
+    question.type === 'multipleChoice'
+      ? shuffle(question.options.map((label, originalIndex) => ({ label, originalIndex })))
+      : [],
+  );
+  const [matchingTerms] = useState(() =>
+    question.type === 'matching' ? shuffle(question.pairs) : [],
+  );
+  const [matchingDefinitions] = useState(() =>
+    question.type === 'matching' ? shuffle(question.pairs) : [],
+  );
 
   // Callers render one instance per question and key on the question id, so a
   // fresh mount already starts with clean answer state — no reset effect needed.
 
   const correct = useMemo(() => {
     if (question.type === 'multipleChoice' || question.type === 'image') {
-      return selected === question.correctIndex;
+      return question.type === 'image'
+        ? selected === question.correctIndex
+        : choiceOptions[selected ?? -1]?.originalIndex === question.correctIndex;
     }
     if (question.type === 'numeric') {
       const normalized = numeric
@@ -45,7 +59,7 @@ export function QuestionInteraction({
       );
     }
     return matched.length === question.pairs.length && !matchingMiss;
-  }, [matched.length, matchingMiss, numeric, question, selected]);
+  }, [choiceOptions, matched.length, matchingMiss, numeric, question, selected]);
 
   const ready =
     question.type === 'multipleChoice' || question.type === 'image'
@@ -59,7 +73,7 @@ export function QuestionInteraction({
       <View style={styles.wrap}>
         <Text style={styles.prompt}>{question.prompt}</Text>
         <View style={styles.matchTerms}>
-          {question.pairs.map((pair) => {
+          {matchingTerms.map((pair) => {
             const done = matched.includes(pair.id);
             const active = activePair === pair.id;
             return (
@@ -86,7 +100,7 @@ export function QuestionInteraction({
           })}
         </View>
         <View style={styles.definitions}>
-          {[...question.pairs].reverse().map((pair) => {
+          {matchingDefinitions.map((pair) => {
             const done = matched.includes(pair.id);
             return (
               <Pressable
@@ -153,10 +167,13 @@ export function QuestionInteraction({
         </Card>
       ) : (
         <View style={styles.options}>
-          {question.options.map((option, index) => {
+          {(question.type === 'multipleChoice'
+            ? choiceOptions
+            : question.options.map((label, originalIndex) => ({ label, originalIndex }))
+          ).map(({ label, originalIndex }, index) => {
             let state: 'idle' | 'correct' | 'wrong' | 'muted' = 'idle';
             if (checked) {
-              if (index === question.correctIndex) state = 'correct';
+              if (originalIndex === question.correctIndex) state = 'correct';
               else if (index === selected) state = 'wrong';
               else state = 'muted';
             }
@@ -164,7 +181,7 @@ export function QuestionInteraction({
               <Option
                 key={`${question.id}-${index}`}
                 index={index}
-                label={option}
+                label={label}
                 selected={selected === index}
                 state={state}
                 disabled={checked}
