@@ -101,24 +101,33 @@ export function IconButton({
   onPress,
   accessibilityLabel,
   active = false,
+  disabled = false,
 }: {
   name: IconName;
   onPress: () => void;
   accessibilityLabel: string;
   active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.iconButton,
         active && styles.iconButtonActive,
-        pressed && styles.pressed,
+        disabled && styles.iconButtonDisabled,
+        pressed && !disabled && styles.pressed,
       ]}
     >
-      <MaterialCommunityIcons name={name} size={21} color={active ? colors.paper : colors.ink} />
+      <MaterialCommunityIcons
+        name={name}
+        size={21}
+        color={disabled ? colors.faint : active ? colors.paper : colors.ink}
+      />
     </Pressable>
   );
 }
@@ -201,13 +210,14 @@ export function Pill({
   tone = 'neutral',
 }: {
   children: ReactNode;
-  tone?: 'neutral' | 'magenta' | 'blue' | 'green' | 'red';
+  tone?: 'neutral' | 'magenta' | 'blue' | 'green' | 'yellow' | 'red';
 }) {
   const value = {
     neutral: [colors.paperDeep, colors.muted],
     magenta: [colors.magentaPale, colors.magenta],
     blue: [colors.bluePale, colors.blue],
     green: [colors.greenPale, colors.green],
+    yellow: [colors.yellowPale, colors.yellowDark],
     red: [colors.redPale, colors.red],
   }[tone];
   return (
@@ -399,6 +409,7 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   iconButtonActive: { backgroundColor: colors.magenta, borderColor: colors.magenta },
+  iconButtonDisabled: { opacity: 0.45 },
   pressed: { opacity: 0.72 },
   primaryButton: {
     minHeight: 54,

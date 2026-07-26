@@ -164,6 +164,7 @@ function collectQuestionRecords(module: ModuleContent): Map<string, QuestionReco
   module.exam.forEach((question) => {
     const citationChapter = question.sourceCitation.chapter.match(/\d+/)?.[0];
     const section =
+      module.sections.find((candidate) => candidate.id === question.sectionId) ??
       module.sections.find((candidate) => String(chapterNumber(candidate)) === citationChapter) ??
       module.sections.find((candidate) =>
         candidate.acsCodes.some((code) => question.acsCodes.includes(code)),
@@ -224,6 +225,7 @@ function questionDocument(module: ModuleContent, record: QuestionRecord): Sanity
     _id: documentId('question', question.id),
     _type: 'question',
     stableId: question.id,
+    lifecycle: 'active',
     title: question.prompt.slice(0, 137),
     prompt: portableText(question.prompt, `${question.id}-prompt`),
     questionType: question.type,
@@ -308,12 +310,13 @@ function lessonDocument(
     _id: documentId('lesson', lesson.id),
     _type: 'lesson',
     stableId: lesson.id,
+    lifecycle: 'active',
     section: reference('section', section.id),
     title: lesson.title,
     slug: { _type: 'slug', current: normalizeId(lesson.title) },
     order: lesson.order,
     estimatedMinutes: lesson.estimatedMinutes,
-    isRequired: true,
+    isRequired: lesson.isRequired !== false,
     learningObjectives: [`Explain ${lesson.title}.`],
     content: [
       lessonBlock('concept', 'Concept', lesson.concept, 0),
@@ -403,6 +406,7 @@ function buildDocuments(
       _id: documentId('figure', figureStableId(module.id, filename)),
       _type: 'figure',
       stableId: figureStableId(module.id, filename),
+      lifecycle: 'active',
       title: question?.image.caption ?? `${section.title} representative figure`,
       image: {
         _type: 'image',
@@ -443,6 +447,7 @@ function buildDocuments(
       _id: documentId('section', section.id),
       _type: 'section',
       stableId: section.id,
+      lifecycle: 'active',
       module: reference('module', module.id),
       title: section.title,
       slug: { _type: 'slug', current: normalizeId(section.title) },
@@ -479,6 +484,7 @@ function buildDocuments(
     _id: documentId('glossaryTerm', term.id),
     _type: 'glossaryTerm',
     stableId: term.id,
+    lifecycle: 'active',
     term: term.term,
     slug: { _type: 'slug', current: normalizeId(`${term.term}-${term.id}`) },
     shortDefinition: term.definition.slice(0, 300),
@@ -494,6 +500,7 @@ function buildDocuments(
     _id: documentId('module', module.id),
     _type: 'module',
     stableId: module.id,
+    lifecycle: 'active',
     title: module.title,
     slug: { _type: 'slug', current: normalizeId(module.title) },
     subtitle: module.shortTitle,

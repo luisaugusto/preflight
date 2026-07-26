@@ -1,6 +1,8 @@
 import {DocumentsIcon} from '@sanity/icons/Documents'
 import {defineArrayMember, defineField, defineType} from 'sanity'
 
+import {lifecycleField} from '../shared/curriculum'
+
 export const section = defineType({
   name: 'section',
   title: 'Section',
@@ -20,6 +22,7 @@ export const section = defineType({
       validation: (rule) =>
         rule.required().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {name: 'kebab-case ID'}),
     }),
+    {...lifecycleField, group: 'identity'},
     defineField({
       name: 'module',
       title: 'Module',
@@ -46,10 +49,11 @@ export const section = defineType({
     }),
     defineField({
       name: 'order',
-      title: 'Order',
+      title: 'Legacy order',
       type: 'number',
       group: 'identity',
-      validation: (rule) => rule.required().integer().positive(),
+      hidden: true,
+      description: 'Ordering is controlled by the parent module reference array.',
     }),
     defineField({
       name: 'chapterNumber',
@@ -101,7 +105,7 @@ export const section = defineType({
       title: 'Ordered lessons',
       type: 'array',
       group: 'curriculum',
-      of: [defineArrayMember({type: 'reference', weak: true, to: [{type: 'lesson'}]})],
+      of: [defineArrayMember({type: 'reference', to: [{type: 'lesson'}]})],
       validation: (rule) => rule.required().min(1).unique(),
     }),
     defineField({
@@ -109,7 +113,7 @@ export const section = defineType({
       title: 'Section quiz questions',
       type: 'array',
       group: 'curriculum',
-      of: [defineArrayMember({type: 'reference', weak: true, to: [{type: 'question'}]})],
+      of: [defineArrayMember({type: 'reference', to: [{type: 'question'}]})],
       validation: (rule) => rule.required().min(1).unique(),
     }),
     defineField({

@@ -16,6 +16,7 @@ import { answerOutcomeToRating, createReviewCard, scheduleReview } from '@/lib/f
 import {
   ExpoFileContentStore,
   MemoryContentStore,
+  normalizeCurriculum,
   overlayCurriculum,
   syncContent,
 } from '@/lib/content-sync';
@@ -24,6 +25,7 @@ import {
   buildVocabularyQuestions,
   selectQuestionWindow,
 } from '@/lib/practice-questions';
+import { findNextIncompleteRequiredLessonIndex } from '@/lib/progress';
 import { colors, fonts } from '@/theme';
 import { OnboardingScreen } from '@/screens/onboarding-screen';
 import { HomeScreen } from '@/screens/home-screen';
@@ -55,8 +57,44 @@ type AppRoute =
   | 'info'
   | 'modules';
 
-const bundledCurriculum = catalogContent as CurriculumBundle;
+const bundledCurriculum = normalizeCurriculum(catalogContent);
 const firstBundledModule = bundledCurriculum.modules[0];
+
+function lessonOrderIndex(section: Section, lessonId: string | null): number {
+  if (!lessonId) return -1;
+  return section.lessons.findIndex((lesson) => lesson.id === lessonId);
+}
+
+export function isForwardResumeProgress(
+  resume: ResumePosition | null,
+  moduleId: string,
+  section: Section,
+  lessonId: string,
+  stage: number,
+): boolean {
+  if (!resume || resume.moduleId !== moduleId || resume.sectionId !== section.id) return true;
+  const currentIndex = lessonOrderIndex(section, resume.lessonId);
+  const targetIndex = lessonOrderIndex(section, lessonId);
+  if (currentIndex < 0 || targetIndex < 0) return true;
+  if (targetIndex !== currentIndex) return targetIndex > currentIndex;
+  return stage >= resume.blockIndex;
+}
+
+export function isLessonReached(
+  resume: ResumePosition | null,
+  moduleId: string,
+  section: Section,
+  lessonId: string,
+  completedLessonIds: ReadonlySet<string>,
+): boolean {
+  if (completedLessonIds.has(lessonId)) return true;
+  return Boolean(
+    resume &&
+    resume.moduleId === moduleId &&
+    resume.sectionId === section.id &&
+    resume.lessonId === lessonId,
+  );
+}
 
 function reconcileCompletedSections(
   curriculum: CurriculumBundle,
@@ -69,7 +107,9 @@ function reconcileCompletedSections(
         .filter(
           (section) =>
             recordedSectionIds.has(section.id) &&
-            section.lessons.every((lesson) => completedLessonIds.has(lesson.id)),
+            section.lessons
+              .filter((lesson) => lesson.isRequired !== false)
+              .every((lesson) => completedLessonIds.has(lesson.id)),
         )
         .map((section) => section.id),
     ),
@@ -193,7 +233,10 @@ export function PreflightApp() {
           );
         }
         if (!manifestUrl) return;
-        const result = await syncContent(manifestUrl, { store });
+        const result = await syncContent(manifestUrl, {
+          store,
+          appVersion: Constants.expoConfig?.version,
+        });
         if (mounted && result.active?.catalog) {
           setCurriculum(
             result.active.manifest.schemaVersion >= 2
@@ -250,9 +293,7 @@ export function PreflightApp() {
   };
 
   const openSection = (section: Section) => {
-    const firstIncomplete = section.lessons.findIndex(
-      (lesson) => !completedLessonIds.has(lesson.id),
-    );
+    const firstIncomplete = findNextIncompleteRequiredLessonIndex(section, completedLessonIds);
     setActiveSectionId(section.id);
     if (firstIncomplete < 0 && !verifiedCompletedSectionIds.has(section.id)) {
       setResumePosition(null);
@@ -260,7 +301,8 @@ export function PreflightApp() {
       setRoute('sectionQuiz');
       return;
     }
-    const targetIndex = firstIncomplete >= 0 ? firstIncomplete : 0;
+    const firstRequired = section.lessons.findIndex((lesson) => lesson.isRequired !== false);
+    const targetIndex = firstIncomplete >= 0 ? firstIncomplete : Math.max(firstRequired, 0);
     const targetLesson = section.lessons[targetIndex];
     const resumedStage =
       resumePosition?.contentVersion === moduleContent.version &&
@@ -297,8 +339,9 @@ export function PreflightApp() {
       contentVersion: moduleContent.version,
     });
     analytics.track('lesson_completed', { sectionId: activeSection.id, lessonId: lesson.id });
-    if (lessonIndex < activeSection.lessons.length - 1) {
-      const nextLesson = activeSection.lessons[lessonIndex + 1];
+    const nextLessonIndex = findNextIncompleteRequiredLessonIndex(activeSection, next, lessonIndex);
+    if (nextLessonIndex >= 0) {
+      const nextLesson = activeSection.lessons[nextLessonIndex];
       const nextResume: ResumePosition = {
         moduleId: moduleContent.id,
         sectionId: activeSection.id,
@@ -310,12 +353,45 @@ export function PreflightApp() {
       setResumePosition(nextResume);
       setLessonStage(0);
       void repository.current?.saveResumePosition(nextResume);
-      setLessonIndex((value) => value + 1);
+      setLessonIndex(nextLessonIndex);
     } else {
       setResumePosition(null);
       void repository.current?.clearResumePosition(moduleContent.id);
       setRoute('sectionQuiz');
     }
+  };
+
+  const navigateLessonScreen = (direction: 'previous' | 'next') => {
+    const nextIndex = direction === 'previous' ? lessonIndex - 1 : lessonIndex + 1;
+    const targetLesson = activeSection.lessons[nextIndex];
+    if (!targetLesson) return;
+    const targetStage = completedLessonIds.has(targetLesson.id)
+      ? 3
+      : resumePosition?.moduleId === moduleContent.id &&
+          resumePosition.sectionId === activeSection.id &&
+          resumePosition.lessonId === targetLesson.id
+        ? resumePosition.blockIndex
+        : 0;
+    setLessonIndex(nextIndex);
+    setLessonStage(targetStage);
+    const isForwardProgress = isForwardResumeProgress(
+      resumePosition,
+      moduleContent.id,
+      activeSection,
+      targetLesson.id,
+      targetStage,
+    );
+    if (!isForwardProgress) return;
+    const nextResume: ResumePosition = {
+      moduleId: moduleContent.id,
+      sectionId: activeSection.id,
+      lessonId: targetLesson.id,
+      blockIndex: targetStage,
+      contentVersion: moduleContent.version,
+      updatedAt: new Date().toISOString(),
+    };
+    setResumePosition(nextResume);
+    void repository.current?.saveResumePosition(nextResume);
   };
 
   const vocabularyQuestions = useMemo(
@@ -486,10 +562,31 @@ export function PreflightApp() {
         lesson={activeSection.lessons[lessonIndex]}
         lessonIndex={lessonIndex}
         initialStage={lessonStage}
+        isLessonComplete={completedLessonIds.has(activeSection.lessons[lessonIndex].id)}
+        canNavigateToPreviousLesson={lessonIndex > 0}
+        canNavigateToNextLesson={
+          lessonIndex < activeSection.lessons.length - 1 &&
+          isLessonReached(
+            resumePosition,
+            moduleContent.id,
+            activeSection,
+            activeSection.lessons[lessonIndex + 1].id,
+            completedLessonIds,
+          )
+        }
+        onNavigateLesson={navigateLessonScreen}
         onExit={() => setRoute('home')}
         onStageChange={(stage) => {
           const lesson = activeSection.lessons[lessonIndex];
           setLessonStage(stage);
+          const isForwardProgress = isForwardResumeProgress(
+            resumePosition,
+            moduleContent.id,
+            activeSection,
+            lesson.id,
+            stage,
+          );
+          if (!isForwardProgress) return;
           const nextResume: ResumePosition = {
             moduleId: moduleContent.id,
             sectionId: activeSection.id,

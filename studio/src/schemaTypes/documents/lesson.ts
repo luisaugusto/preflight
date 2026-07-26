@@ -1,6 +1,8 @@
 import {ComposeIcon} from '@sanity/icons/Compose'
 import {defineArrayMember, defineField, defineType} from 'sanity'
 
+import {lifecycleField} from '../shared/curriculum'
+
 export const lesson = defineType({
   name: 'lesson',
   title: 'Lesson',
@@ -20,6 +22,7 @@ export const lesson = defineType({
       validation: (rule) =>
         rule.required().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {name: 'kebab-case ID'}),
     }),
+    {...lifecycleField, group: 'identity'},
     defineField({
       name: 'section',
       title: 'Section',
@@ -46,10 +49,11 @@ export const lesson = defineType({
     }),
     defineField({
       name: 'order',
-      title: 'Order',
+      title: 'Legacy order',
       type: 'number',
       group: 'identity',
-      validation: (rule) => rule.required().integer().positive(),
+      hidden: true,
+      description: 'Ordering is controlled by the parent section reference array.',
     }),
     defineField({
       name: 'estimatedMinutes',
@@ -89,7 +93,7 @@ export const lesson = defineType({
       title: 'Review questions',
       type: 'array',
       group: 'content',
-      of: [defineArrayMember({type: 'reference', weak: true, to: [{type: 'question'}]})],
+      of: [defineArrayMember({type: 'reference', to: [{type: 'question'}]})],
       validation: (rule) => rule.unique(),
     }),
     defineField({

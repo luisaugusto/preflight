@@ -7,7 +7,7 @@ export interface CompletionLike {
 
 export type CompletionInput = ReadonlySet<string> | readonly string[] | readonly CompletionLike[];
 
-export type LearningStatus = 'locked' | 'available' | 'inProgress' | 'complete';
+export type LearningStatus = 'locked' | 'available' | 'inProgress' | 'updateRequired' | 'complete';
 
 export interface SectionProgress {
   sectionId: string;
@@ -45,6 +45,18 @@ export function orderedLessons(section: Pick<Section, 'lessons'>): Lesson[] {
   return [...section.lessons].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
+export function findNextIncompleteRequiredLessonIndex(
+  section: Pick<Section, 'lessons'>,
+  completions: CompletionInput,
+  afterIndex = -1,
+): number {
+  const completed = toCompletedIdSet(completions);
+  return section.lessons.findIndex(
+    (lesson, index) =>
+      index > afterIndex && lesson.isRequired !== false && !completed.has(lesson.id),
+  );
+}
+
 export function getLessonSequence(module: Pick<ModuleContent, 'sections'>): Lesson[] {
   return orderedSections(module).flatMap(orderedLessons);
 }
@@ -55,9 +67,9 @@ export function isLessonComplete(lessonId: string, completions: CompletionInput)
 
 export function isSectionComplete(section: Section, completions: CompletionInput): boolean {
   const completed = toCompletedIdSet(completions);
-  if (completed.has(section.id)) return true;
   const lessons = orderedLessons(section);
-  return lessons.length > 0 && lessons.every((lesson) => completed.has(lesson.id));
+  const requiredLessons = lessons.filter((lesson) => lesson.isRequired !== false);
+  return requiredLessons.length > 0 && requiredLessons.every((lesson) => completed.has(lesson.id));
 }
 
 export function isSectionUnlocked(
@@ -87,7 +99,9 @@ export function isLessonUnlocked(
   const lessons = orderedLessons(section);
   const index = lessons.findIndex((lesson) => lesson.id === lessonId);
   if (index < 0) return false;
-  return lessons.slice(0, index).every((lesson) => completed.has(lesson.id));
+  return lessons
+    .slice(0, index)
+    .every((lesson) => lesson.isRequired === false || completed.has(lesson.id));
 }
 
 export function calculateSectionProgress(
@@ -95,10 +109,9 @@ export function calculateSectionProgress(
   completions: CompletionInput,
 ): SectionProgress {
   const completed = toCompletedIdSet(completions);
-  const lessons = orderedLessons(section);
+  const lessons = orderedLessons(section).filter((lesson) => lesson.isRequired !== false);
   const completedLessons = lessons.filter((lesson) => completed.has(lesson.id)).length;
-  const isComplete =
-    completed.has(section.id) || (lessons.length > 0 && completedLessons === lessons.length);
+  const isComplete = lessons.length > 0 && completedLessons === lessons.length;
 
   return {
     sectionId: section.id,
@@ -147,6 +160,7 @@ export function getSectionStatus(
   if (!section || !isSectionUnlocked(module, sectionId, completions)) return 'locked';
   const progress = calculateSectionProgress(section, completions);
   if (progress.isComplete) return 'complete';
+  if (toCompletedIdSet(completions).has(section.id)) return 'updateRequired';
   if (progress.completedLessons > 0) return 'inProgress';
   return 'available';
 }
@@ -168,7 +182,10 @@ export function getNextLesson(
   const completed = toCompletedIdSet(completions);
   return (
     getLessonSequence(module).find(
-      (lesson) => !completed.has(lesson.id) && isLessonUnlocked(module, lesson.id, completed),
+      (lesson) =>
+        lesson.isRequired !== false &&
+        !completed.has(lesson.id) &&
+        isLessonUnlocked(module, lesson.id, completed),
     ) ?? null
   );
 }

@@ -1,6 +1,8 @@
 import {ImageIcon} from '@sanity/icons/Image'
 import {defineArrayMember, defineField, defineType} from 'sanity'
 
+import {lifecycleField} from '../shared/curriculum'
+
 export const figure = defineType({
   name: 'figure',
   title: 'Figure',
@@ -20,6 +22,7 @@ export const figure = defineType({
       validation: (rule) =>
         rule.required().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {name: 'kebab-case ID'}),
     }),
+    {...lifecycleField, group: 'asset'},
     defineField({
       name: 'title',
       title: 'Internal title',

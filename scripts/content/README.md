@@ -1,8 +1,9 @@
 # FAA curriculum content pipeline
 
-The schema-v2 catalog combines four checksum-pinned FAA handbooks. The legacy
-`src/content/phak.json` remains available only for schema-v1 sync compatibility;
-`src/content/catalog.json` is the canonical bundled curriculum.
+The extraction tooling combines four checksum-pinned FAA handbooks. Sanity is
+now the canonical authored curriculum; `src/content/catalog.json` is a
+deterministic schema-v3 offline snapshot exported from published Sanity
+documents. Do not run this extraction pipeline to overwrite normal Studio edits.
 
 ## Authoritative sources
 
@@ -28,10 +29,13 @@ npm run content:build
 npm run content:validate
 ```
 
-Downloads and extracted text stay under ignored `tmp/pdfs/`. The build verifies
-the pinned checksums and page counts, generates the four-module catalog and TOC
-coverage report, renders one cited offline figure per section, and emits Metro's
-literal asset registry.
+Downloads and reading-order text extracts stay under ignored `tmp/pdfs/`. The
+build verifies the pinned checksums and page counts, generates the four-module
+catalog and TOC coverage report, renders one cited offline figure per section,
+records each figure's PDF checksum/page so unchanged images are not re-encoded,
+and emits Metro's literal asset registry. Generated lesson checks use statements
+from each lesson's cited page, related handbook concepts as distractors, and
+deterministically varied answer positions.
 
 ## Validation guarantees
 
@@ -42,3 +46,10 @@ literal asset registry.
 - Human printed-page labels plus one-based physical PDF page locators.
 - Pinned FAA-S-ACS-6C vocabulary, valid answers, and existing offline assets.
 - A coverage entry for every section, lesson, and handbook appendix disposition.
+- Unique normalized prompts and at least 90% distinct option and distractor sets.
+- No generic fallback stems, topic-identification answers, or distractors in generated questions.
+- Source-text overlap for lesson checks, section quizzes, and module exams.
+- Source-detail list, cloze, and fact checks with distributed correct-answer positions and bounded question-stem reuse.
+- Unique numeric exam values and rejection of extracted figure/chapter-header artifacts.
+- Rejection of flowed table and figure-legend text (e.g. risk-matrix rows, mnemonic labels) from lesson concepts, explanations, and generated question text.
+- Matching questions cite a page range covering every paired lesson, not just the first pair, so the displayed citation supports each pairing.

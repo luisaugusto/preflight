@@ -25,7 +25,8 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "server"
     },
     "plugins": [
       [
@@ -47,7 +48,7 @@
       "sanityProjectId": "4qoowg94",
       "sanityDataset": "production",
       "sanityApiVersion": "2026-07-12",
-      "contentManifestUrl": "https://cdn.sanity.io/files/4qoowg94/production/461e15f681d856857b874d077b67a76acdb53a84.json",
+      "contentManifestUrl": "https://4qoowg94.apicdn.sanity.io/v2026-07-12/data/query/releases?query=*%5B_type%20%3D%3D%20%22curriculumReleasePointer%22%20%26%26%20_id%20%3D%3D%20%22curriculumReleasePointer.current%22%5D%5B0%5D%7BschemaVersion%2CcatalogId%2CmoduleIds%2CcontentVersion%2CminimumAppVersion%2CbundleUrl%2Cchecksum%2Calgorithm%2CbyteLength%2CcreatedAt%7D",
       "router": {
         "headers": {
           "Cross-Origin-Embedder-Policy": "credentialless",
