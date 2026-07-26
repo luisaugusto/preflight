@@ -53,7 +53,7 @@ As a defense-in-depth complement to the CI gate, enable GitHub's native **secret
 
 ## Content pipeline
 
-The reproducible handbook pipeline is documented in [scripts/content/README.md](./scripts/content/README.md). It pins all four official FAA sources, extracts handbook text and representative figures, builds `src/content/catalog.json`, and rejects invalid coverage, citations, ACS tags, answer keys, provenance, or image references.
+The reproducible handbook pipeline is documented in [scripts/content/README.md](./scripts/content/README.md). It pins all four official FAA sources, extracts handbook text and representative figures, builds `src/content/catalog.json`, and rejects invalid coverage, citations, ACS tags, answer keys, provenance, image references, repeated question patterns, title-identification answers, extraction artifacts, or questions that are not grounded in their cited lesson text.
 
 A weekly [link check](./.github/workflows/link-check.yml) (via [lychee](https://github.com/lycheeverse/lychee)) validates the FAA source URLs configured in this pipeline alongside every Markdown link, so a rotted citation can't silently break traceability. It fails any pull request that touches docs and, on the scheduled run, opens a self-closing tracking issue instead of blocking unrelated work. Known-flaky and placeholder hosts are allowlisted in [lychee.toml](./lychee.toml).
 

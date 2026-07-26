@@ -1,0 +1,447 @@
+{
+  "assets/afh/section-01.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 31
+  },
+  "assets/afh/section-02.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 59
+  },
+  "assets/afh/section-03.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 84
+  },
+  "assets/afh/section-04.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 98
+  },
+  "assets/afh/section-05.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 132
+  },
+  "assets/afh/section-06.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 145
+  },
+  "assets/afh/section-07.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 163
+  },
+  "assets/afh/section-08.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 168
+  },
+  "assets/afh/section-09.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 184
+  },
+  "assets/afh/section-09b.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 199
+  },
+  "assets/afh/section-10.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 216
+  },
+  "assets/afh/section-11.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 230
+  },
+  "assets/afh/section-12.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 242
+  },
+  "assets/afh/section-13.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 264
+  },
+  "assets/afh/section-13b.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 285
+  },
+  "assets/afh/section-14.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 292
+  },
+  "assets/afh/section-15.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 307
+  },
+  "assets/afh/section-16.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 329
+  },
+  "assets/afh/section-17.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 349
+  },
+  "assets/afh/section-18.jpg": {
+    "moduleId": "afh",
+    "pdfChecksum": "90dda95dcbe992bd798f1932b02b5a02d620d8344565c0516a6917f29dea1f8d",
+    "pdfPage": 353
+  },
+  "assets/awh/section-01.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 16
+  },
+  "assets/awh/section-02.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 22
+  },
+  "assets/awh/section-03.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 26
+  },
+  "assets/awh/section-03b.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 55
+  },
+  "assets/awh/section-04.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 65
+  },
+  "assets/awh/section-05.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 67
+  },
+  "assets/awh/section-06.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 86
+  },
+  "assets/awh/section-07.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 92
+  },
+  "assets/awh/section-08.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 109
+  },
+  "assets/awh/section-09.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 115
+  },
+  "assets/awh/section-10.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 131
+  },
+  "assets/awh/section-11.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 141
+  },
+  "assets/awh/section-12.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 152
+  },
+  "assets/awh/section-13.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 164
+  },
+  "assets/awh/section-14.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 166
+  },
+  "assets/awh/section-15.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 189
+  },
+  "assets/awh/section-16.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 197
+  },
+  "assets/awh/section-17.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 218
+  },
+  "assets/awh/section-18.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 232
+  },
+  "assets/awh/section-19.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 239
+  },
+  "assets/awh/section-20.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 246
+  },
+  "assets/awh/section-21.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 253
+  },
+  "assets/awh/section-22.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 275
+  },
+  "assets/awh/section-23.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 283
+  },
+  "assets/awh/section-24.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 302
+  },
+  "assets/awh/section-24b.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 327
+  },
+  "assets/awh/section-24c.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 341
+  },
+  "assets/awh/section-25.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 362
+  },
+  "assets/awh/section-26.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 387
+  },
+  "assets/awh/section-26b.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 401
+  },
+  "assets/awh/section-27.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 403
+  },
+  "assets/awh/section-27b.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 429
+  },
+  "assets/awh/section-27c.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 448
+  },
+  "assets/awh/section-27d.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 469
+  },
+  "assets/awh/section-28.jpg": {
+    "moduleId": "awh",
+    "pdfChecksum": "2a87e4a5613e2a8e060aaf83a95dfc55b61b0e576f5b783df9fdcebe62da62c3",
+    "pdfPage": 471
+  },
+  "assets/phak/chapter-01-early-flight.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 17
+  },
+  "assets/phak/chapter-02-pave-checklist.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 49
+  },
+  "assets/phak/chapter-03-airplane-components.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 75
+  },
+  "assets/phak/chapter-04-airfoil-principles.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 94
+  },
+  "assets/phak/chapter-05-angle-of-attack.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 101
+  },
+  "assets/phak/chapter-06-primary-controls.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 151
+  },
+  "assets/phak/chapter-07-engine-arrangements.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 162
+  },
+  "assets/phak/chapter-08-pitot-static.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 204
+  },
+  "assets/phak/chapter-09-aircraft-documents.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 236
+  },
+  "assets/phak/chapter-10-loading-envelope.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 252
+  },
+  "assets/phak/chapter-11-density-altitude.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 260
+  },
+  "assets/phak/chapter-12-thunderstorm-cycle.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 307
+  },
+  "assets/phak/chapter-13-weather-codes.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 317
+  },
+  "assets/phak/chapter-14-airport-signs.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 344
+  },
+  "assets/phak/chapter-15-airspace-profile.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 377
+  },
+  "assets/phak/chapter-16-sectional-chart.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 389
+  },
+  "assets/phak/chapter-17-spatial-disorientation.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 429
+  },
+  "assets/phak/section-02b.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 67
+  },
+  "assets/phak/section-05b.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 128
+  },
+  "assets/phak/section-05c.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 140
+  },
+  "assets/phak/section-07b.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 184
+  },
+  "assets/phak/section-07c.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 194
+  },
+  "assets/phak/section-14b.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 360
+  },
+  "assets/phak/section-14c.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 367
+  },
+  "assets/phak/section-16b.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 407
+  },
+  "assets/phak/section-16c.jpg": {
+    "moduleId": "phak",
+    "pdfChecksum": "247929cace0ab56b376e683eba540cc4c8f39f199ab35414e8b604e24f395cb7",
+    "pdfPage": 417
+  },
+  "assets/rmh/section-01.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 12
+  },
+  "assets/rmh/section-02.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 17
+  },
+  "assets/rmh/section-03.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 33
+  },
+  "assets/rmh/section-04.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 38
+  },
+  "assets/rmh/section-05.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 43
+  },
+  "assets/rmh/section-06.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 48
+  },
+  "assets/rmh/section-07.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 51
+  },
+  "assets/rmh/section-08.jpg": {
+    "moduleId": "rmh",
+    "pdfChecksum": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+    "pdfPage": 57
+  }
+}
