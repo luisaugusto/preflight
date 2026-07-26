@@ -1,0 +1,64 @@
+name: Deploy Sanity Studio
+
+# Keep the hosted Studio and its deployed schema aligned with the source on
+# main. Documentation-only changes do not need a production deployment.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'studio/.nvmrc'
+      - 'studio/package.json'
+      - 'studio/package-lock.json'
+      - 'studio/sanity.cli.ts'
+      - 'studio/sanity.config.ts'
+      - 'studio/src/**'
+      - 'studio/static/**'
+      - '.github/workflows/sanity-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never interrupt a production deployment. If main advances while one is
+# running, the newest queued run deploys the final state afterwards.
+concurrency:
+  group: sanity-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Studio and schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: studio/.nvmrc
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+
+      - name: Install Studio dependencies
+        run: npm ci
+
+      # Do not mutate production unless the same schema validation used on pull
+      # requests still passes on the merged commit.
+      - name: Validate schema
+        run: npm run schema:validate -- --workspace preflight --level warning
+
+      # Pin the official action to the v0.9-alpha commit. `sanity deploy`
+      # publishes the hosted Studio and its schema together; --schema-required
+      # turns a schema-upload warning into a hard deployment failure.
+      - name: Deploy hosted Studio and schema
+        uses: sanity-io/github-action-sanity@49d3317f54b8ba0f9981205aa3121d2db4e8ad69 # v0.9-alpha
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+          SANITY_STUDIO_CONFIG_PATH: studio
+        with:
+          args: deploy --schema-required --yes

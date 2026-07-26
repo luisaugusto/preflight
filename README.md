@@ -88,6 +88,15 @@ npm run seed:catalog:dry-run
 npm run seed:catalog:cli
 ```
 
+Pull requests run a credential-free Sanity schema validation, Studio typecheck,
+and production build. Pushes to `main` that change Studio source automatically
+deploy the hosted Studio and its schema together.
+
+The deployment workflow requires a repository Actions secret named
+`SANITY_AUTH_TOKEN`. Configure it with a dedicated Sanity deploy token that can
+deploy the Studio and schema for project `4qoowg94`; do not use a token in any
+`EXPO_PUBLIC_*` variable.
+
 Alternatively, provide a server-side Editor token only to the seed process:
 
 ```sh
