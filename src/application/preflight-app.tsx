@@ -53,6 +53,7 @@ type AppRoute =
   | 'daily'
   | 'vocabulary'
   | 'calculations'
+  | 'mistakes'
   | 'info'
   | 'modules';
 
@@ -136,6 +137,8 @@ export function PreflightApp() {
   const [resumePosition, setResumePosition] = useState<ResumePosition | null>(null);
   const [dueQuestionIds, setDueQuestionIds] = useState<string[]>([]);
   const [dailySessionQuestions, setDailySessionQuestions] = useState<Question[]>([]);
+  const [mistakeSessionQuestions, setMistakeSessionQuestions] = useState<Question[]>([]);
+  const [mistakeQuestionIds, setMistakeQuestionIds] = useState<string[]>([]);
   const [vocabularyOffset, setVocabularyOffset] = useState(0);
   const repository = useRef<PreflightRepository | null>(null);
   const moduleSelectionRequest = useRef(0);
@@ -200,6 +203,8 @@ export function PreflightApp() {
           setDueQuestionIds(
             due.filter((card) => card.contentType === 'question').map((card) => card.contentId),
           );
+          const mistakes = await repo.listMistakes();
+          setMistakeQuestionIds(mistakes.map((mistake) => mistake.questionId));
         }
       })
       .catch(() => {
@@ -424,16 +429,36 @@ export function PreflightApp() {
         ),
       ),
       ...vocabularyQuestions,
+      ...calculationQuestions,
     ],
-    [curriculum.modules, eligibleSections, verifiedCompletedSectionIds, vocabularyQuestions],
+    [
+      calculationQuestions,
+      curriculum.modules,
+      eligibleSections,
+      verifiedCompletedSectionIds,
+      vocabularyQuestions,
+    ],
+  );
+
+  const questionsById = useMemo(
+    () => new Map(reviewableQuestions.map((question) => [question.id, question])),
+    [reviewableQuestions],
   );
 
   const dueQuestions = useMemo(() => {
-    const byId = new Map(reviewableQuestions.map((question) => [question.id, question]));
+    const byId = questionsById;
     return dueQuestionIds
       .map((id) => byId.get(id))
       .filter((item): item is Question => Boolean(item));
-  }, [dueQuestionIds, reviewableQuestions]);
+  }, [dueQuestionIds, questionsById]);
+
+  const mistakeQuestions = useMemo(
+    () =>
+      mistakeQuestionIds
+        .map((id) => questionsById.get(id))
+        .filter((item): item is Question => Boolean(item)),
+    [mistakeQuestionIds, questionsById],
+  );
 
   const dailyQuestions = useMemo(() => {
     if (dueQuestions.length) return dueQuestions.slice(0, 8);
@@ -450,6 +475,7 @@ export function PreflightApp() {
     correct: boolean,
     sectionId?: string,
     scheduleForReview = true,
+    trackMistake = true,
   ) => {
     analytics.track('question_answered', { questionId: question.id, type: question.type, correct });
     const repo = repository.current;
@@ -465,7 +491,12 @@ export function PreflightApp() {
         contentVersion:
           curriculum.modules.find((module) => module.id === question.moduleId)?.version ??
           moduleContent.version,
+        trackMistake,
       });
+      if (trackMistake) {
+        const mistakes = await repo.listMistakes();
+        setMistakeQuestionIds(mistakes.map((mistake) => mistake.questionId));
+      }
       if (!scheduleForReview) return;
       const existing = await repo.getReviewCard(question.id, 'question');
       const current = existing ?? createReviewCard(question.id, 'question');
@@ -651,8 +682,10 @@ export function PreflightApp() {
         eligibleSectionCount={eligibleSections.length}
         vocabularyCount={vocabularyQuestions.length}
         calculationCount={calculationQuestions.length}
+        mistakeCount={mistakeQuestions.length}
         onOpen={(nextRoute) => {
           if (nextRoute === 'daily') setDailySessionQuestions(dailyQuestions);
+          if (nextRoute === 'mistakes') setMistakeSessionQuestions(mistakeQuestions);
           setRoute(nextRoute);
         }}
         onPath={() => setRoute('home')}
@@ -709,8 +742,25 @@ export function PreflightApp() {
         onExit={() => setRoute('practice')}
         onFinish={() => setRoute('practice')}
         onQuestionAnswered={(question, correct) =>
-          recordQuestionResult(question, correct, undefined, false)
+          recordQuestionResult(question, correct, undefined, false, false)
         }
+      />
+    );
+  }
+
+  if (route === 'mistakes') {
+    return (
+      <QuizScreen
+        title="Mistake review"
+        label="PRACTICE / MISTAKES"
+        questions={mistakeSessionQuestions.length ? mistakeSessionQuestions : mistakeQuestions}
+        passThreshold={0}
+        onExit={() => setRoute('practice')}
+        onFinish={() => {
+          setMistakeSessionQuestions([]);
+          setRoute('practice');
+        }}
+        onQuestionAnswered={(question, correct) => recordQuestionResult(question, correct)}
       />
     );
   }
