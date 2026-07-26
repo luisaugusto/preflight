@@ -25,6 +25,7 @@ import {
   buildVocabularyQuestions,
   selectQuestionWindow,
 } from '@/lib/practice-questions';
+import { findNextIncompleteRequiredLessonIndex } from '@/lib/progress';
 import { colors, fonts } from '@/theme';
 import { OnboardingScreen } from '@/screens/onboarding-screen';
 import { HomeScreen } from '@/screens/home-screen';
@@ -251,9 +252,7 @@ export function PreflightApp() {
   };
 
   const openSection = (section: Section) => {
-    const firstIncomplete = section.lessons.findIndex(
-      (lesson) => !completedLessonIds.has(lesson.id),
-    );
+    const firstIncomplete = findNextIncompleteRequiredLessonIndex(section, completedLessonIds);
     setActiveSectionId(section.id);
     if (firstIncomplete < 0 && !verifiedCompletedSectionIds.has(section.id)) {
       setResumePosition(null);
@@ -261,7 +260,8 @@ export function PreflightApp() {
       setRoute('sectionQuiz');
       return;
     }
-    const targetIndex = firstIncomplete >= 0 ? firstIncomplete : 0;
+    const firstRequired = section.lessons.findIndex((lesson) => lesson.isRequired !== false);
+    const targetIndex = firstIncomplete >= 0 ? firstIncomplete : Math.max(firstRequired, 0);
     const targetLesson = section.lessons[targetIndex];
     const resumedStage =
       resumePosition?.contentVersion === moduleContent.version &&
@@ -298,8 +298,9 @@ export function PreflightApp() {
       contentVersion: moduleContent.version,
     });
     analytics.track('lesson_completed', { sectionId: activeSection.id, lessonId: lesson.id });
-    if (lessonIndex < activeSection.lessons.length - 1) {
-      const nextLesson = activeSection.lessons[lessonIndex + 1];
+    const nextLessonIndex = findNextIncompleteRequiredLessonIndex(activeSection, next, lessonIndex);
+    if (nextLessonIndex >= 0) {
+      const nextLesson = activeSection.lessons[nextLessonIndex];
       const nextResume: ResumePosition = {
         moduleId: moduleContent.id,
         sectionId: activeSection.id,
@@ -311,7 +312,7 @@ export function PreflightApp() {
       setResumePosition(nextResume);
       setLessonStage(0);
       void repository.current?.saveResumePosition(nextResume);
-      setLessonIndex((value) => value + 1);
+      setLessonIndex(nextLessonIndex);
     } else {
       setResumePosition(null);
       void repository.current?.clearResumePosition(moduleContent.id);

@@ -138,9 +138,25 @@ jobs:
               --body-file "$body"
           fi
 
-      - name: Report no content change
+      - name: Close stale release PR and report no content change
         if: steps.export.outputs.changed != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CURRICULUM_RELEASE_TOKEN }}
+          RELEASE_BRANCH: automation/sanity-curriculum-release
         run: |
+          existing="$(
+            gh pr list \
+              --state open \
+              --head "$RELEASE_BRANCH" \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+          if [ -n "$existing" ]; then
+            gh pr comment "$existing" \
+              --body "Closing automatically because the latest Sanity export matches \`main\`; this snapshot is no longer eligible for publication."
+            gh pr close "$existing"
+          fi
+
           {
             echo "### No curriculum release needed"
             echo

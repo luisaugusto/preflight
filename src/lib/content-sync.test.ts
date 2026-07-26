@@ -5,6 +5,7 @@ import catalogJson from '../content/catalog.json';
 import {
   MemoryContentStore,
   compareContentVersions,
+  compareSemanticVersions,
   normalizeContent,
   normalizeCurriculum,
   overlayCurriculum,
@@ -202,6 +203,12 @@ describe('content validation', () => {
       ),
     ).toBe(1);
   });
+
+  it('uses SemVer prerelease precedence for app compatibility', () => {
+    expect(compareSemanticVersions('1.0.0', '1.0.0-beta')).toBe(1);
+    expect(compareSemanticVersions('1.0.0-beta.2', '1.0.0-beta.11')).toBe(-1);
+    expect(compareSemanticVersions('1.0.0+release.2', '1.0.0+release.1')).toBe(0);
+  });
 });
 
 describe('safe content updates', () => {
@@ -282,6 +289,38 @@ describe('safe content updates', () => {
     expect(result).toMatchObject({
       status: 'failed',
       error: 'Content requires app 2.0.0 or newer',
+    });
+  });
+
+  it('rejects a stable-only release on a prerelease app build', async () => {
+    const catalog = normalizeCurriculum(catalogJson);
+    const candidate = {
+      ...catalog,
+      minimumAppVersion: '1.0.0',
+    };
+    const raw = JSON.stringify(candidate);
+    const candidateManifest: ContentManifest = {
+      schemaVersion: 3,
+      catalogId: catalog.catalogId,
+      moduleIds: catalog.modules.map((module) => module.id),
+      contentVersion: catalog.contentVersion,
+      bundleUrl: 'https://cdn.example.com/catalog.json',
+      checksum: 'e'.repeat(64),
+      algorithm: 'sha256',
+      createdAt: catalog.generatedAt ?? '2026-07-26T00:00:00.000Z',
+      minimumAppVersion: '1.0.0',
+    };
+
+    const result = await updateContentFromManifest(candidateManifest, {
+      store: new MemoryContentStore(),
+      appVersion: '1.0.0-beta',
+      hash: async () => 'e'.repeat(64),
+      downloadText: async () => raw,
+    });
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      error: 'Content requires app 1.0.0 or newer',
     });
   });
 });

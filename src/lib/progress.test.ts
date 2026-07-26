@@ -9,6 +9,7 @@ import type {
 } from './content/types';
 import {
   calculateModuleProgress,
+  findNextIncompleteRequiredLessonIndex,
   getNextLesson,
   getSectionStatus,
   isLessonUnlocked,
@@ -124,6 +125,27 @@ describe('sequential progression', () => {
     expect(getSectionStatus(moduleContent, 'section-1', required)).toBe('complete');
 
     moduleContent.sections.find((item) => item.id === 'section-1')?.lessons.pop();
+  });
+
+  it('skips optional and completed lessons when finding required navigation targets', () => {
+    const currentSection = section('section-with-optional', 1);
+    const optional = lesson('optional', 2);
+    optional.isRequired = false;
+    currentSection.lessons.splice(1, 0, optional);
+
+    expect(findNextIncompleteRequiredLessonIndex(currentSection, [])).toBe(0);
+    expect(
+      findNextIncompleteRequiredLessonIndex(currentSection, ['section-with-optional-lesson-1']),
+    ).toBe(2);
+    expect(
+      findNextIncompleteRequiredLessonIndex(currentSection, ['section-with-optional-lesson-1'], 0),
+    ).toBe(2);
+    expect(
+      findNextIncompleteRequiredLessonIndex(currentSection, [
+        'section-with-optional-lesson-1',
+        'section-with-optional-lesson-2',
+      ]),
+    ).toBe(-1);
   });
 
   it('marks a previously completed section when new required work is added', () => {

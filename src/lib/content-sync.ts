@@ -692,6 +692,62 @@ function sanityReleaseTimestamp(value: string): number | null {
   );
 }
 
+interface SemanticVersion {
+  core: [string, string, string];
+  prerelease: string[];
+}
+
+const semanticVersionPattern =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+function compareNumericIdentifiers(left: string, right: string): number {
+  if (left.length !== right.length) return Math.sign(left.length - right.length);
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+
+function parseSemanticVersion(value: string): SemanticVersion {
+  const match = semanticVersionPattern.exec(value.trim());
+  if (!match) throw new Error(`Invalid semantic app version: ${value}`);
+  return {
+    core: [match[1], match[2], match[3]],
+    prerelease: match[4]?.split('.') ?? [],
+  };
+}
+
+export function compareSemanticVersions(left: string, right: string): number {
+  const leftVersion = parseSemanticVersion(left);
+  const rightVersion = parseSemanticVersion(right);
+
+  for (let index = 0; index < leftVersion.core.length; index += 1) {
+    const difference = compareNumericIdentifiers(leftVersion.core[index], rightVersion.core[index]);
+    if (difference !== 0) return difference;
+  }
+
+  if (leftVersion.prerelease.length === 0 || rightVersion.prerelease.length === 0) {
+    if (leftVersion.prerelease.length === rightVersion.prerelease.length) return 0;
+    return leftVersion.prerelease.length === 0 ? 1 : -1;
+  }
+
+  const length = Math.max(leftVersion.prerelease.length, rightVersion.prerelease.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftIdentifier = leftVersion.prerelease[index];
+    const rightIdentifier = rightVersion.prerelease[index];
+    if (leftIdentifier === undefined || rightIdentifier === undefined) {
+      return leftIdentifier === undefined ? -1 : 1;
+    }
+    if (leftIdentifier === rightIdentifier) continue;
+
+    const leftIsNumeric = /^\d+$/.test(leftIdentifier);
+    const rightIsNumeric = /^\d+$/.test(rightIdentifier);
+    if (leftIsNumeric && rightIsNumeric) {
+      return compareNumericIdentifiers(leftIdentifier, rightIdentifier);
+    }
+    if (leftIsNumeric !== rightIsNumeric) return leftIsNumeric ? -1 : 1;
+    return leftIdentifier < rightIdentifier ? -1 : 1;
+  }
+  return 0;
+}
+
 export function compareContentVersions(left: string, right: string): number {
   const leftParts = versionParts(left);
   const rightParts = versionParts(right);
@@ -766,7 +822,7 @@ export async function updateContentFromManifest(
     const candidate = await validateContentPayload(raw, manifest, dependencies.hash ?? sha256);
     if (
       dependencies.appVersion &&
-      compareContentVersions(candidate.catalog.minimumAppVersion, dependencies.appVersion) > 0
+      compareSemanticVersions(candidate.catalog.minimumAppVersion, dependencies.appVersion) > 0
     ) {
       throw new Error(`Content requires app ${candidate.catalog.minimumAppVersion} or newer`);
     }

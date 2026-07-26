@@ -45,6 +45,18 @@ export function orderedLessons(section: Pick<Section, 'lessons'>): Lesson[] {
   return [...section.lessons].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
+export function findNextIncompleteRequiredLessonIndex(
+  section: Pick<Section, 'lessons'>,
+  completions: CompletionInput,
+  afterIndex = -1,
+): number {
+  const completed = toCompletedIdSet(completions);
+  return section.lessons.findIndex(
+    (lesson, index) =>
+      index > afterIndex && lesson.isRequired !== false && !completed.has(lesson.id),
+  );
+}
+
 export function getLessonSequence(module: Pick<ModuleContent, 'sections'>): Lesson[] {
   return orderedSections(module).flatMap(orderedLessons);
 }
