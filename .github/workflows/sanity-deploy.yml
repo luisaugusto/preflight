@@ -11,6 +11,7 @@ on:
       - 'studio/package-lock.json'
       - 'studio/sanity.cli.ts'
       - 'studio/sanity.config.ts'
+      - 'studio/tsconfig.json'
       - 'studio/src/**'
       - 'studio/static/**'
       - '.github/workflows/sanity-deploy.yml'
@@ -29,13 +30,20 @@ jobs:
   deploy:
     name: Deploy Studio and schema
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # workflow_dispatch allows a branch to be selected independently of the
+    # push filter above. Never give a non-main ref the production token.
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: studio
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          # The previously-live main commit is needed for the final production
+          # drift check immediately before deployment.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -57,6 +65,90 @@ jobs:
       # requests still passes on the merged commit.
       - name: Validate schema
         run: npm run schema:validate -- --workspace preflight --level warning
+
+      # A PR check can become stale if production changes before merge. Compare
+      # the schema expected to be live before this push with production again
+      # inside the deployment job, immediately before any mutation.
+      - name: Extract schema expected in production
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          comparison_dir="$RUNNER_TEMP/sanity-predeploy-comparison"
+          baseline_worktree="$RUNNER_TEMP/preflight-production-baseline"
+          baseline_manifest_dir="$comparison_dir/baseline-manifest"
+          baseline_sha="$PUSH_BEFORE"
+
+          if [ -z "$baseline_sha" ] || \
+             [ "$baseline_sha" = "0000000000000000000000000000000000000000" ]; then
+            baseline_sha="${{ github.sha }}"
+          fi
+
+          mkdir -p "$baseline_manifest_dir"
+          git worktree add --detach "$baseline_worktree" "$baseline_sha"
+          (
+            cd "$baseline_worktree"
+            npm ci
+            cd studio
+            npm ci
+            npx sanity manifest extract --path "$baseline_manifest_dir"
+          )
+          baseline_schema_file="$(
+            jq -r '.workspaces[] | select(.name == "preflight") | .schema' \
+              "$baseline_manifest_dir/create-manifest.json"
+          )"
+          jq -S '.' "$baseline_manifest_dir/$baseline_schema_file" \
+            > "$comparison_dir/baseline-schema.json"
+
+      - name: Download deployed production schema
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$SANITY_AUTH_TOKEN" ]; then
+            echo "::error::Add the SANITY_AUTH_TOKEN repository Actions secret before deploying."
+            exit 1
+          fi
+
+          comparison_dir="$RUNNER_TEMP/sanity-predeploy-comparison"
+          npx sanity schemas list --json --id '_.schemas.preflight' \
+            | jq -S '.schema | fromjson' \
+            > "$comparison_dir/production-schema.json"
+
+      - name: Require production schema to match the expected baseline
+        run: |
+          comparison_dir="$RUNNER_TEMP/sanity-predeploy-comparison"
+          drift_diff="$comparison_dir/baseline-to-production.diff"
+
+          if ! diff -u \
+            "$comparison_dir/baseline-schema.json" \
+            "$comparison_dir/production-schema.json" \
+            > "$drift_diff"; then
+            {
+              echo "### ❌ Production schema drift detected"
+              echo
+              echo "Production changed after the reviewed baseline. Reconcile the"
+              echo "deployed schema before this workflow can replace it."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Production schema no longer matches the expected baseline."
+            exit 1
+          fi
+
+          {
+            echo "### ✅ Production schema baseline verified"
+            echo
+            echo "The deployed schema still matches the version this deployment is"
+            echo "approved to replace."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload pre-deployment schema comparison
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sanity-predeploy-schema-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sanity-predeploy-comparison/*.json
+            ${{ runner.temp }}/sanity-predeploy-comparison/*.diff
+          if-no-files-found: ignore
+          retention-days: 14
 
       # Re-run the semantic compatibility check against the latest production
       # documents immediately before deployment. This closes the race between a
