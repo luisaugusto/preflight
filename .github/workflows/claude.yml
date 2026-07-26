@@ -19,9 +19,13 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      # Claude needs write access to push fixes, including changes under
+      # .github/workflows, and to report those fixes back on the requesting PR
+      # or issue. The action still limits who can invoke it to repository
+      # collaborators with write access.
+      contents: write
+      pull-requests: write
+      issues: write
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
@@ -60,6 +64,9 @@ jobs:
           # or https://code.claude.com/docs/en/cli-reference for available options
           # Bash is disabled by default. Keep this allowlist aligned with the
           # commands in ci.yml so Claude can install dependencies and verify its
-          # changes without granting arbitrary shell access.
+          # changes without granting arbitrary shell access. The content:*
+          # prefix covers the complete content pipeline (download, build,
+          # extract, and validate), including future content scripts that use
+          # the same deliberately scoped npm-script namespace.
           claude_args: |
-            --allowedTools "Bash(npm ci),Bash(npm run typecheck),Bash(npm run lint),Bash(npm run format:check),Bash(npm test:*),Bash(npm run content:validate),Bash(npx expo-doctor@1.20.0)"
+            --allowedTools "Bash(npm ci),Bash(npm run typecheck),Bash(npm run lint),Bash(npm run format:check),Bash(npm test:*),Bash(npm run content:*),Bash(npx expo-doctor@1.20.0)"
