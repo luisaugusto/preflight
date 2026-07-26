@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { ContentReport } from '@/components/content-report';
 import { FIGURE_ASSETS } from '@/content/figure-assets';
 import type { Question } from '@/lib/content/types';
 import { Card, Feedback, Option, PrimaryButton } from '@/components/ui';
@@ -123,6 +124,7 @@ export function QuestionInteraction({
           disabled={!ready}
           onPress={() => (checked ? onComplete(correct) : setChecked(true))}
         />
+        <ContentReport contentType="question" content={question} />
         <Citation question={question} />
       </View>
     );
@@ -182,6 +184,7 @@ export function QuestionInteraction({
         disabled={!ready}
         onPress={() => (checked ? onComplete(correct) : setChecked(true))}
       />
+      <ContentReport contentType="question" content={question} />
       <Citation question={question} />
     </View>
   );

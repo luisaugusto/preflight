@@ -1,6 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { ContentReport } from '@/components/content-report';
 import { QuestionInteraction } from '@/components/question-interaction';
 import {
   Card,
@@ -120,6 +121,7 @@ export function LessonScreen({
             <Text style={styles.explanation}>{lesson.explanation}</Text>
           </Card>
           <PrimaryButton label="SHOW ME HOW" onPress={() => moveToStage(1)} />
+          <ContentReport contentType="lesson" content={lesson} lessonPart="concept" />
         </View>
       ) : null}
 
@@ -139,6 +141,7 @@ export function LessonScreen({
             </Text>
           </View>
           <PrimaryButton label="TRY ONE" onPress={() => moveToStage(2)} />
+          <ContentReport contentType="lesson" content={lesson} lessonPart="workedExample" />
         </View>
       ) : null}
 
