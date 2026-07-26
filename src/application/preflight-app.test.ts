@@ -1,3 +1,8 @@
+/* eslint-disable import/first */
+jest.mock('@/components/question-interaction', () => ({
+  QuestionInteraction: () => null,
+}));
+
 import catalogContent from '@/content/catalog.json';
 import { normalizeCurriculum } from '@/lib/content-sync';
 import type { ResumePosition } from '@/lib/db';
