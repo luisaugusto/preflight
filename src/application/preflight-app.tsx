@@ -89,9 +89,9 @@ export function isLessonReached(
   if (completedLessonIds.has(lessonId)) return true;
   return Boolean(
     resume &&
-      resume.moduleId === moduleId &&
-      resume.sectionId === section.id &&
-      resume.lessonId === lessonId,
+    resume.moduleId === moduleId &&
+    resume.sectionId === section.id &&
+    resume.lessonId === lessonId,
   );
 }
 
