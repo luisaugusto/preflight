@@ -31,9 +31,16 @@ export function HomeScreen({
   const allSectionsComplete = nextIncompleteIndex === -1;
   const activeIndex = allSectionsComplete ? sections.length - 1 : nextIncompleteIndex;
   const activeSection = sections[activeIndex];
-  const sectionLessonDone = activeSection.lessons.filter((lesson) =>
-    completedLessonIds.has(lesson.id),
+  const activeRequiredLessons = activeSection.lessons.filter(
+    (lesson) => lesson.isRequired !== false,
   ).length;
+  const sectionLessonDone = activeSection.lessons.filter(
+    (lesson) => lesson.isRequired !== false && completedLessonIds.has(lesson.id),
+  ).length;
+  const knowledgeCheckReady =
+    !allSectionsComplete &&
+    activeRequiredLessons > 0 &&
+    sectionLessonDone === activeRequiredLessons;
   const overallLessons = sections.flatMap((section) => section.lessons);
   const completedCount = overallLessons.filter((lesson) =>
     completedLessonIds.has(lesson.id),
@@ -105,15 +112,25 @@ export function HomeScreen({
         accessibilityLabel={
           allSectionsComplete
             ? `Start ${module.shortTitle} module exam`
-            : `Continue ${activeSection.title}`
+            : knowledgeCheckReady
+              ? `Take knowledge check for ${activeSection.title}`
+              : `Continue ${activeSection.title}`
         }
       >
         <Card style={styles.continueCard} accent={colors.ink}>
           <View style={styles.continueTop}>
-            <Eyebrow color={colors.magentaPale}>
-              {allSectionsComplete ? 'FINAL CHECK' : 'NEXT LEG'}
+            <Eyebrow color={knowledgeCheckReady ? colors.yellow : colors.magentaPale}>
+              {allSectionsComplete
+                ? 'FINAL CHECK'
+                : knowledgeCheckReady
+                  ? 'KNOWLEDGE CHECK READY'
+                  : 'NEXT LEG'}
             </Eyebrow>
-            <MaterialCommunityIcons name="navigation-variant" size={27} color={colors.magenta} />
+            <MaterialCommunityIcons
+              name={knowledgeCheckReady ? 'clipboard-text-outline' : 'navigation-variant'}
+              size={27}
+              color={knowledgeCheckReady ? colors.yellow : colors.magenta}
+            />
           </View>
           <Text style={styles.continueTitle}>
             {allSectionsComplete
@@ -123,7 +140,9 @@ export function HomeScreen({
           <Text style={styles.continueMeta}>
             {allSectionsComplete
               ? `${module.exam.length} questions · 80% to pass · retakes allowed`
-              : `Section ${activeSection.order} · Lesson ${Math.min(sectionLessonDone + 1, activeSection.lessons.length)} of ${activeSection.lessons.length} · ~4 min`}
+              : knowledgeCheckReady
+                ? `Section ${activeSection.order} · ${activeSection.quiz.length} questions · tap to begin`
+                : `Section ${activeSection.order} · Lesson ${Math.min(sectionLessonDone + 1, activeRequiredLessons)} of ${activeRequiredLessons} · ~4 min`}
           </Text>
         </Card>
       </Pressable>
@@ -140,6 +159,12 @@ export function HomeScreen({
           const done = completedSectionIds.has(section.id);
           const active = !allSectionsComplete && index === activeIndex;
           const locked = !allSectionsComplete && index > activeIndex;
+          const requiredLessons = section.lessons.filter((lesson) => lesson.isRequired !== false);
+          const requiredLessonDone = requiredLessons.filter((lesson) =>
+            completedLessonIds.has(lesson.id),
+          ).length;
+          const quizReady =
+            active && requiredLessons.length > 0 && requiredLessonDone === requiredLessons.length;
           return (
             <RouteSection
               key={section.id}
@@ -147,10 +172,10 @@ export function HomeScreen({
               done={done}
               active={active}
               locked={locked}
+              quizReady={quizReady}
               last={index === sections.length - 1}
-              lessonDone={
-                section.lessons.filter((lesson) => completedLessonIds.has(lesson.id)).length
-              }
+              lessonDone={requiredLessonDone}
+              lessonTotal={requiredLessons.length}
               onPress={() => !locked && onOpenSection(section)}
             />
           );
@@ -200,57 +225,86 @@ function RouteSection({
   done,
   active,
   locked,
+  quizReady,
   last,
   lessonDone,
+  lessonTotal,
   onPress,
 }: {
   section: Section;
   done: boolean;
   active: boolean;
   locked: boolean;
+  quizReady: boolean;
   last: boolean;
   lessonDone: number;
+  lessonTotal: number;
   onPress: () => void;
 }) {
-  const percent = section.lessons.length
-    ? Math.round((lessonDone / section.lessons.length) * 100)
-    : 0;
+  const percent = lessonTotal ? Math.round((lessonDone / lessonTotal) * 100) : 0;
   return (
     <View style={styles.routeItem}>
       <View style={styles.routeRail}>
-        <View style={[styles.marker, done && styles.markerDone, active && styles.markerActive]}>
+        <View
+          style={[
+            styles.marker,
+            done && styles.markerDone,
+            quizReady ? styles.markerQuizReady : active && styles.markerActive,
+          ]}
+        >
           {done ? (
             <MaterialCommunityIcons name="check" size={14} color={colors.paper} />
+          ) : quizReady ? (
+            <MaterialCommunityIcons
+              name="clipboard-text-outline"
+              size={14}
+              color={colors.yellowDark}
+            />
           ) : active ? (
             <View style={styles.activeDot} />
           ) : null}
         </View>
         {!last ? (
-          <View style={[styles.routeLine, (done || active) && styles.routeLineTraveled]} />
+          <View
+            style={[
+              styles.routeLine,
+              (done || (active && !quizReady)) && styles.routeLineTraveled,
+              quizReady && styles.routeLineQuizReady,
+            ]}
+          />
         ) : null}
       </View>
       <Pressable
         onPress={onPress}
         disabled={locked}
         accessibilityRole="button"
-        accessibilityLabel={`Section ${section.order}: ${section.title}`}
+        accessibilityLabel={`Section ${section.order}: ${section.title}${
+          done ? ', complete' : quizReady ? ', knowledge check ready' : ''
+        }`}
         accessibilityState={{ disabled: locked }}
         style={({ pressed }) => [styles.routePressable, pressed && { opacity: 0.72 }]}
       >
         <View
-          style={[styles.routeCard, active && styles.routeCardActive, locked && styles.lockedCard]}
+          style={[
+            styles.routeCard,
+            active && !quizReady && styles.routeCardActive,
+            quizReady && styles.routeCardQuizReady,
+            locked && styles.lockedCard,
+          ]}
         >
           <View style={styles.routeCardHead}>
             <Text style={styles.routeNumber}>{String(section.order).padStart(2, '0')}</Text>
-            <Pill tone={done ? 'green' : active ? 'magenta' : 'neutral'}>
-              {done ? 'STAMPED' : active ? 'FLY' : 'LOCKED'}
+            <Pill tone={done ? 'green' : quizReady ? 'yellow' : active ? 'magenta' : 'neutral'}>
+              {done ? 'STAMPED' : quizReady ? 'CHECK' : active ? 'FLY' : 'LOCKED'}
             </Pill>
           </View>
           <Text style={styles.routeTitle}>{section.title}</Text>
           <Text style={styles.routeMeta}>
             {done
               ? `${section.lessons.length} lessons · quiz passed · 100%`
-              : `${lessonDone} of ${section.lessons.length} lessons flown · ${percent}%`}
+              : quizReady
+                ? `Knowledge check ready · ${section.quiz.length} questions`
+                : `${lessonDone} of ${lessonTotal} lessons flown · ${percent}%`}
           </Text>
         </View>
       </Pressable>
@@ -338,6 +392,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
     marginTop: 9,
   },
+  markerQuizReady: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderColor: colors.yellow,
+    backgroundColor: colors.yellowPale,
+    marginTop: 8,
+  },
   activeDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.magenta },
   routeLine: {
     position: 'absolute',
@@ -347,6 +409,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lineStrong,
   },
   routeLineTraveled: { backgroundColor: colors.magenta },
+  routeLineQuizReady: { backgroundColor: colors.yellow },
   routePressable: { flex: 1, paddingBottom: 8 },
   routeCard: {
     minHeight: 72,
@@ -358,6 +421,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
   },
   routeCardActive: { borderColor: colors.magenta, borderWidth: 1.5 },
+  routeCardQuizReady: {
+    borderColor: colors.yellow,
+    borderWidth: 1.5,
+    backgroundColor: colors.yellowPale,
+  },
   lockedCard: { opacity: 0.52 },
   routeCardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   routeNumber: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted, letterSpacing: 1.5 },

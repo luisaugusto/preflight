@@ -29,6 +29,38 @@ describe('module navigation', () => {
     expect(onModules).toHaveBeenCalledTimes(1);
   });
 
+  it('shows a distinct knowledge-check-ready state after required lessons are complete', async () => {
+    const section = phak.sections[0];
+    const completedLessonIds = new Set(
+      section.lessons.filter((lesson) => lesson.isRequired !== false).map((lesson) => lesson.id),
+    );
+    const onOpenSection = jest.fn();
+    const screen = await render(
+      <HomeScreen
+        module={phak}
+        moduleNumber={1}
+        completedLessonIds={completedLessonIds}
+        completedSectionIds={new Set()}
+        onOpenSection={onOpenSection}
+        onPractice={jest.fn()}
+        onInfo={jest.fn()}
+        onExam={jest.fn()}
+        onModules={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('KNOWLEDGE CHECK READY')).toBeTruthy();
+    expect(
+      screen.getByText(`Knowledge check ready · ${section.quiz.length} questions`),
+    ).toBeTruthy();
+    expect(screen.getByText('CHECK')).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByLabelText(`Section ${section.order}: ${section.title}, knowledge check ready`),
+    );
+    expect(onOpenSection).toHaveBeenCalledWith(section);
+  });
+
   it('shows all module progress cards and selects another module', async () => {
     const onSelect = jest.fn();
     const screen = await render(
