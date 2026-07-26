@@ -201,13 +201,14 @@ export function Pill({
   tone = 'neutral',
 }: {
   children: ReactNode;
-  tone?: 'neutral' | 'magenta' | 'blue' | 'green' | 'red';
+  tone?: 'neutral' | 'magenta' | 'blue' | 'green' | 'yellow' | 'red';
 }) {
   const value = {
     neutral: [colors.paperDeep, colors.muted],
     magenta: [colors.magentaPale, colors.magenta],
     blue: [colors.bluePale, colors.blue],
     green: [colors.greenPale, colors.green],
+    yellow: [colors.yellowPale, colors.yellowDark],
     red: [colors.redPale, colors.red],
   }[tone];
   return (
