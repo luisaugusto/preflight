@@ -2,6 +2,7 @@
 
 export type ContentId = string;
 export type AcsCode = string;
+export type ContentLifecycle = 'active' | 'retired';
 
 export interface SourceCitation {
   handbook: string;
@@ -56,6 +57,7 @@ export interface MatchingPair {
 
 interface BaseQuestion {
   id: ContentId;
+  lifecycle?: ContentLifecycle;
   /** Owning module and source section; required by catalog-wide practice. */
   moduleId?: ContentId;
   sectionId?: ContentId;
@@ -92,6 +94,9 @@ export type Question = MultipleChoiceQuestion | ImageQuestion | NumericQuestion 
 
 export interface Lesson {
   id: ContentId;
+  lifecycle?: ContentLifecycle;
+  /** Defaults to true for schema-v1/v2 snapshots and generated practice. */
+  isRequired?: boolean;
   title: string;
   order: number;
   estimatedMinutes: number;
@@ -105,6 +110,7 @@ export interface Lesson {
 
 export interface Section {
   id: ContentId;
+  lifecycle?: ContentLifecycle;
   title: string;
   order: number;
   summary: string;
@@ -117,6 +123,7 @@ export interface Section {
 
 export interface GlossaryTerm {
   id: ContentId;
+  lifecycle?: ContentLifecycle;
   moduleId?: ContentId;
   term: string;
   definition: string;
@@ -127,6 +134,7 @@ export interface GlossaryTerm {
 
 export interface ModuleContent {
   id: ContentId;
+  lifecycle?: ContentLifecycle;
   title: string;
   shortTitle: string;
   description: string;
@@ -145,12 +153,14 @@ export interface ContentBundle {
   module: ModuleContent;
 }
 
-/** Atomic schema-v2 curriculum used by bundled and remotely synchronized content. */
+/** Atomic schema-v3 curriculum authored in Sanity and used offline and remotely. */
 export interface CurriculumBundle {
-  schemaVersion: 2;
+  schemaVersion: 3;
   catalogId: ContentId;
   contentVersion: string;
   generatedAt?: string;
+  sourceDigest: string;
+  minimumAppVersion: string;
   modules: ModuleContent[];
 }
 

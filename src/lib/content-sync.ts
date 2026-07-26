@@ -13,6 +13,7 @@ import type {
 const nonEmptyString = z.string().trim().min(1);
 const contentIdSchema = nonEmptyString.max(200);
 const acsCodesSchema = z.array(nonEmptyString).min(1);
+const lifecycleSchema = z.enum(['active', 'retired']).default('active');
 
 export const sourceCitationSchema: z.ZodType<SourceCitation> = z
   .object({
@@ -29,6 +30,7 @@ export const sourceCitationSchema: z.ZodType<SourceCitation> = z
 
 const questionBaseShape = {
   id: contentIdSchema,
+  lifecycle: lifecycleSchema,
   moduleId: contentIdSchema.optional(),
   sectionId: contentIdSchema.optional(),
   prompt: nonEmptyString,
@@ -141,6 +143,8 @@ export const questionSchema: z.ZodType<Question> = z
 const lessonSchema = z
   .object({
     id: contentIdSchema,
+    lifecycle: lifecycleSchema,
+    isRequired: z.boolean().default(true),
     title: nonEmptyString,
     order: z.number().int().nonnegative(),
     estimatedMinutes: z.number().positive().max(5),
@@ -156,6 +160,7 @@ const lessonSchema = z
 const sectionSchema = z
   .object({
     id: contentIdSchema,
+    lifecycle: lifecycleSchema,
     title: nonEmptyString,
     order: z.number().int().nonnegative(),
     summary: nonEmptyString,
@@ -169,6 +174,7 @@ const sectionSchema = z
 const glossaryTermSchema = z
   .object({
     id: contentIdSchema,
+    lifecycle: lifecycleSchema,
     moduleId: contentIdSchema.optional(),
     term: nonEmptyString,
     definition: nonEmptyString,
@@ -181,6 +187,7 @@ const glossaryTermSchema = z
 export const moduleContentSchema: z.ZodType<ModuleContent> = z
   .object({
     id: contentIdSchema,
+    lifecycle: lifecycleSchema,
     title: nonEmptyString,
     shortTitle: nonEmptyString,
     description: nonEmptyString,
@@ -302,10 +309,12 @@ export const contentBundleSchema: z.ZodType<ContentBundle> = z
 
 export const curriculumBundleSchema: z.ZodType<CurriculumBundle> = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     catalogId: contentIdSchema,
     contentVersion: nonEmptyString,
     generatedAt: z.string().datetime({ offset: true }).optional(),
+    sourceDigest: nonEmptyString,
+    minimumAppVersion: nonEmptyString,
     modules: z.array(moduleContentSchema).min(1),
   })
   .strict()
@@ -450,11 +459,38 @@ export function normalizeCurriculum(input: unknown): CurriculumBundle {
   const catalog = curriculumBundleSchema.safeParse(input);
   if (catalog.success) return catalog.data;
 
+  if (input && typeof input === 'object' && 'modules' in input) {
+    const legacy = input as {
+      catalogId?: unknown;
+      contentVersion?: unknown;
+      generatedAt?: unknown;
+      modules?: unknown;
+    };
+    if (Array.isArray(legacy.modules)) {
+      const modules = legacy.modules.map((module) => moduleContentSchema.parse(module));
+      if (modules.length > 0) {
+        return curriculumBundleSchema.parse({
+          schemaVersion: 3,
+          catalogId:
+            typeof legacy.catalogId === 'string' ? legacy.catalogId : 'preflight-faa-curriculum',
+          contentVersion:
+            typeof legacy.contentVersion === 'string' ? legacy.contentVersion : modules[0].version,
+          ...(typeof legacy.generatedAt === 'string' ? { generatedAt: legacy.generatedAt } : {}),
+          sourceDigest: 'legacy-bundled-snapshot',
+          minimumAppVersion: '1.0.0',
+          modules,
+        });
+      }
+    }
+  }
+
   const module = normalizeContent(input);
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     catalogId: 'preflight-faa-curriculum',
     contentVersion: module.version,
+    sourceDigest: 'legacy-module-snapshot',
+    minimumAppVersion: '1.0.0',
     modules: [module],
   };
 }
@@ -519,6 +555,7 @@ export interface ContentManifest {
   algorithm: 'sha256';
   byteLength?: number;
   createdAt: string;
+  minimumAppVersion?: string;
 }
 
 export const contentManifestSchema: z.ZodType<ContentManifest> = z
@@ -533,6 +570,7 @@ export const contentManifestSchema: z.ZodType<ContentManifest> = z
     algorithm: z.literal('sha256'),
     byteLength: z.number().int().positive().optional(),
     createdAt: z.string().datetime({ offset: true }),
+    minimumAppVersion: nonEmptyString.optional(),
   })
   .strict()
   .superRefine((manifest, context) => {
@@ -583,6 +621,7 @@ export interface ContentUpdateDependencies {
   downloadText?: (url: string) => Promise<string>;
   hash?: (raw: string) => Promise<string>;
   force?: boolean;
+  appVersion?: string;
 }
 
 function utf8ByteLength(value: string): number {
@@ -628,6 +667,9 @@ export async function validateContentPayload(
   if (catalog.contentVersion !== manifest.contentVersion) {
     throw new Error('Downloaded content version does not match the manifest');
   }
+  if (manifest.minimumAppVersion && catalog.minimumAppVersion !== manifest.minimumAppVersion) {
+    throw new Error('Downloaded minimum app version does not match the manifest');
+  }
   return { manifest, raw, catalog, module: catalog.modules[0] };
 }
 
@@ -635,6 +677,75 @@ function versionParts(value: string): number[] | null {
   const normalized = value.trim().replace(/^v/i, '');
   if (!/^\d+(?:\.\d+)*$/.test(normalized)) return null;
   return normalized.split('.').map(Number);
+}
+
+function sanityReleaseTimestamp(value: string): number | null {
+  const match = value.match(/^(\d{4})\.(\d{2})\.(\d{2})-sanity\.(\d{2})(\d{2})(\d{2})(?:\.|$)/);
+  if (!match) return null;
+  return Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6]),
+  );
+}
+
+interface SemanticVersion {
+  core: [string, string, string];
+  prerelease: string[];
+}
+
+const semanticVersionPattern =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+function compareNumericIdentifiers(left: string, right: string): number {
+  if (left.length !== right.length) return Math.sign(left.length - right.length);
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+
+function parseSemanticVersion(value: string): SemanticVersion {
+  const match = semanticVersionPattern.exec(value.trim());
+  if (!match) throw new Error(`Invalid semantic app version: ${value}`);
+  return {
+    core: [match[1], match[2], match[3]],
+    prerelease: match[4]?.split('.') ?? [],
+  };
+}
+
+export function compareSemanticVersions(left: string, right: string): number {
+  const leftVersion = parseSemanticVersion(left);
+  const rightVersion = parseSemanticVersion(right);
+
+  for (let index = 0; index < leftVersion.core.length; index += 1) {
+    const difference = compareNumericIdentifiers(leftVersion.core[index], rightVersion.core[index]);
+    if (difference !== 0) return difference;
+  }
+
+  if (leftVersion.prerelease.length === 0 || rightVersion.prerelease.length === 0) {
+    if (leftVersion.prerelease.length === rightVersion.prerelease.length) return 0;
+    return leftVersion.prerelease.length === 0 ? 1 : -1;
+  }
+
+  const length = Math.max(leftVersion.prerelease.length, rightVersion.prerelease.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftIdentifier = leftVersion.prerelease[index];
+    const rightIdentifier = rightVersion.prerelease[index];
+    if (leftIdentifier === undefined || rightIdentifier === undefined) {
+      return leftIdentifier === undefined ? -1 : 1;
+    }
+    if (leftIdentifier === rightIdentifier) continue;
+
+    const leftIsNumeric = /^\d+$/.test(leftIdentifier);
+    const rightIsNumeric = /^\d+$/.test(rightIdentifier);
+    if (leftIsNumeric && rightIsNumeric) {
+      return compareNumericIdentifiers(leftIdentifier, rightIdentifier);
+    }
+    if (leftIsNumeric !== rightIsNumeric) return leftIsNumeric ? -1 : 1;
+    return leftIdentifier < rightIdentifier ? -1 : 1;
+  }
+  return 0;
 }
 
 export function compareContentVersions(left: string, right: string): number {
@@ -647,6 +758,11 @@ export function compareContentVersions(left: string, right: string): number {
       if (difference !== 0) return Math.sign(difference);
     }
     return 0;
+  }
+  const leftTimestamp = sanityReleaseTimestamp(left);
+  const rightTimestamp = sanityReleaseTimestamp(right);
+  if (leftTimestamp !== null && rightTimestamp !== null) {
+    return Math.sign(leftTimestamp - rightTimestamp);
   }
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
 }
@@ -704,6 +820,12 @@ export async function updateContentFromManifest(
 
     const raw = await (dependencies.downloadText ?? defaultDownloadText)(manifest.bundleUrl);
     const candidate = await validateContentPayload(raw, manifest, dependencies.hash ?? sha256);
+    if (
+      dependencies.appVersion &&
+      compareSemanticVersions(candidate.catalog.minimumAppVersion, dependencies.appVersion) > 0
+    ) {
+      throw new Error(`Content requires app ${candidate.catalog.minimumAppVersion} or newer`);
+    }
     await dependencies.store.stage(candidate);
     activationStarted = true;
     await dependencies.store.activate();
@@ -731,7 +853,11 @@ export async function updateContentFromManifest(
 export async function fetchContentManifest(url: string): Promise<ContentManifest> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Manifest download failed with HTTP ${response.status}`);
-  return contentManifestSchema.parse(await response.json());
+  const json: unknown = await response.json();
+  if (json && typeof json === 'object' && 'result' in json) {
+    return contentManifestSchema.parse((json as { result: unknown }).result);
+  }
+  return contentManifestSchema.parse(json);
 }
 
 export async function syncContent(
